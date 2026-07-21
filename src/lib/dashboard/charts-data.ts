@@ -1,0 +1,51 @@
+import { PoRow } from "./po-rows";
+
+const EXPIRY_BUCKETS: Array<{ label: string; test: (days: number) => boolean }> = [
+  { label: "Overdue", test: (d) => d < 0 },
+  { label: "0–3 days", test: (d) => d >= 0 && d <= 3 },
+  { label: "4–7 days", test: (d) => d > 3 && d <= 7 },
+  { label: "8–14 days", test: (d) => d > 7 && d <= 14 },
+  { label: "15–30 days", test: (d) => d > 14 && d <= 30 },
+  { label: "30+ days", test: (d) => d > 30 },
+];
+
+export function expiryTimeline(rows: PoRow[]) {
+  return EXPIRY_BUCKETS.map((bucket) => ({
+    label: bucket.label,
+    value: rows.filter((r) => bucket.test(r.daysRemaining)).length,
+  }));
+}
+
+export function poValueByMarketplace(rows: PoRow[]) {
+  const byMarketplace = new Map<string, number>();
+  for (const r of rows) {
+    if (r.po.poValue === null) continue;
+    byMarketplace.set(r.po.marketplace, (byMarketplace.get(r.po.marketplace) ?? 0) + r.po.poValue);
+  }
+  return Array.from(byMarketplace, ([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
+}
+
+export function pendingQtyByCity(rows: PoRow[], topN = 10) {
+  const byCity = new Map<string, number>();
+  for (const r of rows) {
+    byCity.set(r.po.city, (byCity.get(r.po.city) ?? 0) + r.po.pendingQty);
+  }
+  return Array.from(byCity, ([label, value]) => ({ label, value }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, topN);
+}
+
+export function operationalDelayByMarketplace(rows: PoRow[]) {
+  const sums = new Map<string, { total: number; count: number }>();
+  for (const r of rows) {
+    if (r.appointmentDelayDays === null) continue;
+    const cur = sums.get(r.po.marketplace) ?? { total: 0, count: 0 };
+    cur.total += r.appointmentDelayDays;
+    cur.count += 1;
+    sums.set(r.po.marketplace, cur);
+  }
+  return Array.from(sums, ([label, { total, count }]) => ({
+    label,
+    value: count > 0 ? Math.round((total / count) * 10) / 10 : 0,
+  })).sort((a, b) => b.value - a.value);
+}

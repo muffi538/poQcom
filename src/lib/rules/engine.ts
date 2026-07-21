@@ -22,6 +22,7 @@ export interface RuleRunResult {
   flags: string[];
   confidence: number;
   explanation: string[];
+  recommendedActions: string[];
 }
 
 function toNumber(v: unknown): number | null {
@@ -95,6 +96,7 @@ export function runRules(rules: Rule[], ctx: EvalContext): RuleRunResult {
   const applied: string[] = [];
   const skipped: string[] = [];
   const explanation: string[] = [];
+  const recommendedActions: string[] = [];
 
   for (const rule of ordered) {
     const matches = evaluateGroup(rule.conditions, ctx);
@@ -106,6 +108,7 @@ export function runRules(rules: Rule[], ctx: EvalContext): RuleRunResult {
     applied.push(rule.id);
     explanation.push(rule.action.reason || rule.name);
     rule.action.addFlags.forEach((f) => flags.add(f));
+    if (rule.action.recommendedAction) recommendedActions.push(rule.action.recommendedAction);
 
     if (rule.action.scoreDelta !== null) {
       score =
@@ -122,5 +125,6 @@ export function runRules(rules: Rule[], ctx: EvalContext): RuleRunResult {
     flags: Array.from(flags),
     confidence: ordered.length > 0 ? applied.length / ordered.length : 0,
     explanation,
+    recommendedActions,
   };
 }

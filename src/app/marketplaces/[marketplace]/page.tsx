@@ -2,10 +2,14 @@ import { notFound } from "next/navigation";
 import { MARKETPLACES } from "@/types/marketplace";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { AwaitingConfig } from "@/components/dashboard/awaiting-config";
+import { PoControlTower } from "@/components/dashboard/po-control-tower";
+import { PoCharts } from "@/components/dashboard/po-charts";
 import { fetchPurchaseOrders, SupportedMarketplace } from "@/lib/sheets/marketplaces";
 import { listRules } from "@/lib/rules/storage";
 import { getEngineConfig } from "@/lib/config/store";
 import { buildExecutiveSummary } from "@/lib/dashboard/summary";
+import { buildPoRows } from "@/lib/dashboard/po-rows";
+import { isTerminalStatus } from "@/types/purchase-order";
 
 export function generateStaticParams() {
   return MARKETPLACES.map((m) => ({ marketplace: m.toLowerCase() }));
@@ -32,6 +36,8 @@ export default async function MarketplacePage({
 
   let errorMessage: string | null = null;
   let summary: Awaited<ReturnType<typeof buildExecutiveSummary>> | null = null;
+  let rows: ReturnType<typeof buildPoRows> = [];
+  let hasRules = false;
 
   try {
     const [pos, rules, config] = await Promise.all([
@@ -40,6 +46,9 @@ export default async function MarketplacePage({
       getEngineConfig(),
     ]);
     summary = buildExecutiveSummary(pos, rules, config);
+    const activePos = pos.filter((po) => !isTerminalStatus(po.status));
+    rows = buildPoRows(activePos, rules, config);
+    hasRules = rules.some((r) => r.enabled);
   } catch (err) {
     errorMessage = err instanceof Error ? err.message : "Failed to load PO data.";
   }
@@ -60,6 +69,13 @@ export default async function MarketplacePage({
           <KpiCard label="Risk (Critical + High)" value={summary.critical + summary.high} />
         </div>
       ) : null}
+
+      {!errorMessage && (
+        <>
+          <PoControlTower rows={rows} marketplaces={[marketplace]} hasRules={hasRules} />
+          <PoCharts rows={rows} />
+        </>
+      )}
     </div>
   );
 }

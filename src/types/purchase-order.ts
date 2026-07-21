@@ -72,4 +72,5 @@ export interface PoPriorityResult {
   flags: string[];
   confidence: number;
   explanation: string[];
+  recommendedActions: string[];
 }

@@ -63,6 +63,7 @@ export interface RuleAction {
   scoreDelta: number | null; // null when this rule only adds flags, no score
   addFlags: string[];
   reason: string; // human-readable explanation shown in Explanation / Simulator
+  recommendedAction: string; // e.g. "Dispatch immediately" — shown per-PO in the control tower
 }
 
 export type StopBehavior = "stop" | "continue";

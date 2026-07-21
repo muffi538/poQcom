@@ -32,5 +32,6 @@ export function computePoPriority(
     flags: result.flags,
     confidence: result.confidence,
     explanation: result.explanation,
+    recommendedActions: result.recommendedActions,
   };
 }
