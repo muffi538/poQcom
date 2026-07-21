@@ -107,8 +107,11 @@ new look:
   indicators.
 - Lucide icons throughout; loading skeletons (`app/loading.tsx`,
   `marketplaces/[marketplace]/loading.tsx`) for the data-fetching routes.
-- Dark mode unchanged in behavior (already `prefers-color-scheme`-based)
-  but restyled to match — charcoal, not pure black.
+- Manual Light/Dark/System toggle in the sidebar (`src/components/theme/`)
+  — defaults to OS preference, overridable and persisted in
+  `localStorage`, applied via a blocking inline script so there's no
+  flash of the wrong theme on load. Dark mode itself is unchanged visually
+  — charcoal, not pure black.
 - Deliberately not built in this pass (real functionality, not just
   styling, so out of scope for "don't change functionality"): saved
   views, column pinning, CSV/PDF export, expandable rows. Flag if you

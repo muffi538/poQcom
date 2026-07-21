@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { MARKETPLACES } from "@/types/marketplace";
 import { MARKETPLACE_THEMES } from "@/lib/theme/marketplace-colors";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 const staticLinks = [{ href: "/", label: "Overview", icon: LayoutDashboard }];
 const toolLinks = [
@@ -116,13 +117,16 @@ export function Sidebar() {
         ))}
       </nav>
 
-      <button
-        onClick={() => setCollapsed((c) => !c)}
-        className="m-2 flex items-center justify-center gap-2 rounded-xl border border-frido-border py-2 text-xs text-neutral-500 transition-colors hover:bg-neutral-50 dark:border-white/10 dark:hover:bg-neutral-900"
-      >
-        {collapsed ? <ChevronsRight size={16} /> : <ChevronsLeft size={16} />}
-        {!collapsed && "Collapse"}
-      </button>
+      <div className="m-2 space-y-2">
+        <ThemeToggle collapsed={collapsed} />
+        <button
+          onClick={() => setCollapsed((c) => !c)}
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-frido-border py-2 text-xs text-neutral-500 transition-colors hover:bg-neutral-50 dark:border-white/10 dark:hover:bg-neutral-900"
+        >
+          {collapsed ? <ChevronsRight size={16} /> : <ChevronsLeft size={16} />}
+          {!collapsed && "Collapse"}
+        </button>
+      </div>
     </aside>
   );
 }
