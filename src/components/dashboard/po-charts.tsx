@@ -34,7 +34,7 @@ export function PoCharts({ rows, accentHex }: { rows: PoRow[]; accentHex?: strin
       />
       <BarChart title="Pending Qty by City (top 10)" data={pendingQtyByCity(rows)} defaultColor={singleHue} />
       <BarChart
-        title="Avg Operational Delay by Marketplace (days)"
+        title="Avg Days Late by Marketplace (overdue POs only)"
         data={operationalDelayByMarketplace(rows)}
         colorMap={MARKETPLACE_COLORS}
         valueFormatter={(n) => `${n}d`}

@@ -35,12 +35,16 @@ export function pendingQtyByCity(rows: PoRow[], topN = 10) {
     .slice(0, topN);
 }
 
+// Average days late (today − expiry) among currently-overdue POs, per
+// marketplace — the Operational Delay replacement for the retired SLA %
+// chart. Only counts POs that are actually overdue; a marketplace with
+// none shows 0, not a negative "days remaining" average.
 export function operationalDelayByMarketplace(rows: PoRow[]) {
   const sums = new Map<string, { total: number; count: number }>();
   for (const r of rows) {
-    if (r.appointmentDelayDays === null) continue;
+    if (!r.isOverdue || r.operationalDelayDays === null) continue;
     const cur = sums.get(r.po.marketplace) ?? { total: 0, count: 0 };
-    cur.total += r.appointmentDelayDays;
+    cur.total += r.operationalDelayDays;
     cur.count += 1;
     sums.set(r.po.marketplace, cur);
   }

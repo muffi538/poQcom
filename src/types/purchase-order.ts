@@ -68,15 +68,31 @@ export function classifyStatus(status: string): StatusBucket {
   return "needs_review";
 }
 
-// Derived, not stored — computed by the SLA calculator from poRaisedDate /
-// expiryDate / today. Kept separate from PurchaseOrder so the raw sheet
-// row and the computed timeline never get confused with each other.
+// Derived, not stored — computed from poRaisedDate / expiryDate / today.
+// Kept separate from PurchaseOrder so the raw sheet row and the computed
+// timeline never get confused with each other.
+//
+// SLA % consumed was retired (confirmed: misleading for this workflow) —
+// operationalDelayDays is the replacement, and the primary priority
+// signal: how many days past its own expiry date a still-outstanding PO
+// is, using today's actual date, never a hardcoded one.
 export interface PoTimeline {
   totalProcessingWindowDays: number;
   daysUsed: number;
-  daysRemaining: number;
-  slaConsumedPercent: number;
+  daysRemaining: number; // expiryDate − today; negative once overdue
+  // today − expiryDate, only computed for non-Delivered POs with a valid
+  // expiry date; null when Delivered or expiry date is blank/unparseable
+  // ("Unknown" in the UI). Positive = days late, 0 = due today, negative
+  // = days remaining — i.e. -daysRemaining, gated by those two cases.
+  operationalDelayDays: number | null;
+  isOverdue: boolean; // operationalDelayDays !== null && operationalDelayDays > 0
+  hasDataError: boolean; // PO Raised Date is after Expiry Date
+  // Gap between Expiry Date and Appointment Date — kept for the existing
+  // confirmed "Appointment Delay > 2 days" rule (a different question
+  // from operationalDelayDays: this is about the appointment being
+  // booked late, not about the PO itself being overdue today).
   appointmentDelayDays: number | null;
+  appointmentScheduledTooLate: boolean; // Appointment Date is after Expiry Date
   isMetroCity: boolean;
 }
 

@@ -5,7 +5,7 @@ import { PoRow } from "@/lib/dashboard/po-rows";
 import { PoDetailPanel } from "./po-detail-panel";
 import { MarketplaceBadge } from "./marketplace-badge";
 import { StatusBadge } from "./status-badge";
-import { SlaBar } from "./sla-bar";
+import { OperationalDelayBadge } from "./operational-delay";
 import { fmtDate, fmtCurrency } from "./po-format";
 
 // Read-only table for POs that are deliberately NOT run through the
@@ -38,7 +38,7 @@ export function SecondaryPoTable({
           <table className="w-full min-w-[1100px] text-left text-sm">
             <thead className="sticky top-0 z-10 bg-white/95 text-xs uppercase tracking-wide text-neutral-500 backdrop-blur dark:bg-neutral-900/95">
               <tr className="border-b border-frido-border dark:border-white/10">
-                {["Status", "Marketplace", "PO Number", "City / FC", "PO Date", "Expiry Date", "Pending Qty", "PO Value", "Days Left", "SLA %"].map(
+                {["Status", "Marketplace", "PO Number", "City / FC", "PO Date", "Expiry Date", "Pending Qty", "PO Value", "Operational Delay"].map(
                   (h) => (
                     <th key={h} className="whitespace-nowrap px-3 py-2.5 font-medium">
                       {h}
@@ -66,9 +66,8 @@ export function SecondaryPoTable({
                   <td className="px-3 py-2.5 whitespace-nowrap text-neutral-500">{fmtDate(r.po.expiryDate)}</td>
                   <td className="px-3 py-2.5 tabular-nums">{r.po.pendingQty.toLocaleString("en-IN")}</td>
                   <td className="px-3 py-2.5 tabular-nums">{fmtCurrency(r.po.poValue)}</td>
-                  <td className="px-3 py-2.5 tabular-nums">{r.daysRemaining}</td>
                   <td className="px-3 py-2.5">
-                    <SlaBar percent={r.slaConsumedPercent} />
+                    <OperationalDelayBadge days={r.operationalDelayDays} />
                   </td>
                 </tr>
               ))}

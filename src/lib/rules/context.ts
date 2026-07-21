@@ -19,7 +19,8 @@ export function buildEvalContext(po: PurchaseOrder, timeline: PoTimeline): EvalC
     pendingQty: po.pendingQty,
     poValue: po.poValue,
     daysRemaining: timeline.daysRemaining,
-    slaConsumedPercent: timeline.slaConsumedPercent,
+    operationalDelayDays: timeline.operationalDelayDays,
+    isOverdue: timeline.isOverdue,
     appointmentDelayDays: timeline.appointmentDelayDays,
     isMetroCity: timeline.isMetroCity,
   };

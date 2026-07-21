@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { Package, Boxes, Truck, Clock, Percent, ShieldAlert } from "lucide-react";
+import { Package, Boxes, Truck, Clock, AlertTriangle, ShieldAlert } from "lucide-react";
 import { MARKETPLACES } from "@/types/marketplace";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { AwaitingConfig } from "@/components/dashboard/awaiting-config";
@@ -21,10 +21,6 @@ export function generateStaticParams() {
 
 function fmtDays(n: number | null): string {
   return n === null ? "—" : `${n.toFixed(1)}d`;
-}
-
-function fmtPercent(n: number | null): string {
-  return n === null ? "—" : `${n.toFixed(0)}%`;
 }
 
 export default async function MarketplacePage({
@@ -79,12 +75,18 @@ export default async function MarketplacePage({
         {errorMessage ? (
           <AwaitingConfig title={`${marketplace} PO table`} items={[errorMessage]} />
         ) : summary ? (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
             <KpiCard label="Pending Orders" value={summary.totalActive} icon={Package} tone="accent" />
+            <KpiCard label="Expired Pending POs" value={summary.expiredPending} icon={AlertTriangle} tone="critical" />
             <KpiCard label="Pending Qty" value={summary.pendingQty} icon={Boxes} tone="accent" />
             <KpiCard label="Avg Dispatch Time" value={fmtDays(summary.avgDispatchTimeDays)} icon={Truck} tone="accent" />
             <KpiCard label="Avg Appointment Delay" value={fmtDays(summary.avgAppointmentDelayDays)} icon={Clock} tone="accent" />
-            <KpiCard label="SLA %" value={fmtPercent(summary.avgSlaConsumedPercent)} icon={Percent} tone="accent" />
+            <KpiCard
+              label="Avg Days Late (overdue)"
+              value={summary.avgOperationalDelayDaysLate === null ? "—" : `${summary.avgOperationalDelayDaysLate.toFixed(1)}d`}
+              icon={AlertTriangle}
+              tone="critical"
+            />
             <KpiCard label="Risk (Critical + High)" value={summary.critical + summary.high} icon={ShieldAlert} tone="critical" />
           </div>
         ) : null}

@@ -14,11 +14,13 @@ export interface ExecutiveSummary {
   unscored: number;
   expired: number;
   expiringToday: number;
+  expiringTomorrow: number;
+  expiredPending: number; // isOverdue: past its own expiry date, still not Delivered
   pendingQty: number;
   pendingValue: number;
   avgDispatchTimeDays: number | null;
   avgAppointmentDelayDays: number | null;
-  avgSlaConsumedPercent: number | null;
+  avgOperationalDelayDaysLate: number | null; // average lateness among the currently-overdue only
 }
 
 function average(values: number[]): number | null {
@@ -29,9 +31,12 @@ function average(values: number[]): number | null {
 // `pos` is expected to already exclude terminal statuses and "Low Value
 // Cant Dispatch" (the caller filters those out before calling — see
 // classifyStatus). Priority scoring, pending qty/value, expiring-today,
-// and SLA% only run over Status = "Pending" (confirmed: only Pending goes
-// through the priority chain) — Expired POs get their own count/section
-// instead of being scored alongside Pending ones.
+// and Operational Delay only run over Status = "Pending" (confirmed:
+// only Pending goes through the priority chain) — Expired POs get their
+// own count/section instead of being scored alongside Pending ones.
+//
+// SLA % consumed was retired (confirmed misleading) — Operational Delay
+// (today vs. expiry date, for non-Delivered POs) is the replacement.
 export function buildExecutiveSummary(
   pos: PurchaseOrder[],
   rules: Rule[],
@@ -42,7 +47,7 @@ export function buildExecutiveSummary(
 
   const dispatchTimes: number[] = [];
   const appointmentDelays: number[] = [];
-  const slaConsumed: number[] = [];
+  const operationalDelaysLate: number[] = [];
 
   let critical = 0,
     high = 0,
@@ -50,6 +55,8 @@ export function buildExecutiveSummary(
     low = 0,
     unscored = 0,
     expiringToday = 0,
+    expiringTomorrow = 0,
+    expiredPending = 0,
     pendingQty = 0,
     pendingValue = 0;
 
@@ -75,13 +82,16 @@ export function buildExecutiveSummary(
     }
 
     if (timeline.daysRemaining === 0) expiringToday++;
+    if (timeline.daysRemaining === 1) expiringTomorrow++;
+    if (timeline.isOverdue) {
+      expiredPending++;
+      if (timeline.operationalDelayDays !== null) operationalDelaysLate.push(timeline.operationalDelayDays);
+    }
 
     pendingQty += po.pendingQty;
     if (po.poValue !== null && po.orderedQty > 0) {
       pendingValue += (po.pendingQty / po.orderedQty) * po.poValue;
     }
-
-    slaConsumed.push(timeline.slaConsumedPercent);
   }
 
   // Dispatch time and appointment delay are historical/informational, so
@@ -111,10 +121,12 @@ export function buildExecutiveSummary(
     unscored,
     expired,
     expiringToday,
+    expiringTomorrow,
+    expiredPending,
     pendingQty,
     pendingValue,
     avgDispatchTimeDays: average(dispatchTimes),
     avgAppointmentDelayDays: average(appointmentDelays),
-    avgSlaConsumedPercent: average(slaConsumed),
+    avgOperationalDelayDaysLate: average(operationalDelaysLate),
   };
 }

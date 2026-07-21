@@ -25,7 +25,11 @@ export const FIELD_CATALOG: FieldDefinition[] = [
   { key: "poValue", label: "PO Value", type: "number", source: "derived" },
 
   { key: "daysRemaining", label: "Days Remaining", type: "number", source: "derived" },
-  { key: "slaConsumedPercent", label: "SLA Consumed %", type: "number", source: "derived" },
+  // SLA % consumed retired (confirmed misleading) — Operational Delay is
+  // the replacement: today minus expiry date, for any non-Delivered PO
+  // with a real expiry date. Positive = days late.
+  { key: "operationalDelayDays", label: "Operational Delay (days late)", type: "number", source: "derived" },
+  { key: "isOverdue", label: "Is Overdue (expired but not Delivered)", type: "boolean", source: "derived" },
   { key: "appointmentDelayDays", label: "Appointment Delay (days)", type: "number", source: "derived" },
   { key: "isMetroCity", label: "Is Metro City", type: "boolean", source: "derived" },
 ];

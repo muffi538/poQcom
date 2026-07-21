@@ -1,42 +1,42 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search, SearchX, ArrowUpDown, MapPinned } from "lucide-react";
+import { Search, SearchX, ArrowUpDown, MapPinned, AlertTriangle } from "lucide-react";
 import { PoRow } from "@/lib/dashboard/po-rows";
 import { PriorityBadge } from "./priority-badge";
 import { MarketplaceBadge } from "./marketplace-badge";
-import { SlaBar } from "./sla-bar";
+import { OperationalDelayBadge, formatOperationalDelay } from "./operational-delay";
 import { PoDetailPanel } from "./po-detail-panel";
 import { fmtDate, fmtCurrency } from "./po-format";
 
 type SortKey =
   | "priority"
+  | "overdue"
   | "expiry"
   | "value"
   | "qty"
-  | "sla"
-  | "delay"
+  | "apptDelay"
   | "newest"
   | "oldest";
 
 const SORTERS: Record<SortKey, (a: PoRow, b: PoRow) => number> = {
   priority: (a, b) => b.score - a.score,
+  overdue: (a, b) => (b.operationalDelayDays ?? -Infinity) - (a.operationalDelayDays ?? -Infinity),
   expiry: (a, b) => a.daysRemaining - b.daysRemaining,
   value: (a, b) => (b.po.poValue ?? -1) - (a.po.poValue ?? -1),
   qty: (a, b) => b.po.pendingQty - a.po.pendingQty,
-  sla: (a, b) => b.slaConsumedPercent - a.slaConsumedPercent,
-  delay: (a, b) => (b.appointmentDelayDays ?? -1) - (a.appointmentDelayDays ?? -1),
+  apptDelay: (a, b) => (b.appointmentDelayDays ?? -1) - (a.appointmentDelayDays ?? -1),
   newest: (a, b) => (b.po.poRaisedDate || "").localeCompare(a.po.poRaisedDate || ""),
   oldest: (a, b) => (a.po.poRaisedDate || "").localeCompare(b.po.poRaisedDate || ""),
 };
 
 const SORT_LABELS: Record<SortKey, string> = {
   priority: "Highest Priority",
+  overdue: "Most Overdue (Operational Delay)",
   expiry: "Expiry Nearest",
   value: "Highest Value",
   qty: "Largest Qty",
-  sla: "Highest SLA Risk",
-  delay: "Largest Operational Delay",
+  apptDelay: "Largest Appointment Delay",
   newest: "Newest PO",
   oldest: "Oldest PO",
 };
@@ -57,6 +57,7 @@ export function PoControlTower({ rows, marketplaces, hasRules }: Props) {
   const [levelFilter, setLevelFilter] = useState<string>("all");
   const [metroFilter, setMetroFilter] = useState<"all" | "metro" | "non-metro">("all");
   const [criticalOnly, setCriticalOnly] = useState(false);
+  const [overdueOnly, setOverdueOnly] = useState(false);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<PoRow | null>(null);
 
@@ -74,13 +75,14 @@ export function PoControlTower({ rows, marketplaces, hasRules }: Props) {
       if (metroFilter === "metro" && !r.isMetroCity) return false;
       if (metroFilter === "non-metro" && r.isMetroCity) return false;
       if (criticalOnly && r.level !== "Critical") return false;
+      if (overdueOnly && !r.isOverdue) return false;
       if (search.trim()) {
         const q = search.trim().toLowerCase();
         if (!r.po.id.toLowerCase().includes(q) && !r.po.sku.toLowerCase().includes(q)) return false;
       }
       return true;
     });
-  }, [rows, marketplaceFilter, cityFilter, levelFilter, metroFilter, criticalOnly, search]);
+  }, [rows, marketplaceFilter, cityFilter, levelFilter, metroFilter, criticalOnly, overdueOnly, search]);
 
   const sorted = useMemo(
     () => [...filtered].sort(SORTERS[sortKey]),
@@ -88,12 +90,21 @@ export function PoControlTower({ rows, marketplaces, hasRules }: Props) {
   );
 
   // Sections computed from real fields only — none of these invent a
-  // score. "Critical Action Queue" and "Safe to Postpone" are deliberately
-  // NOT included here: both require the scoring engine's actual judgment,
-  // which doesn't exist until rules are published (see hasRules below).
+  // score. "Safe to Postpone" is deliberately NOT included here: it needs
+  // the scoring engine's actual judgment across more confirmed rules than
+  // exist yet (see hasRules below). "Expired Pending POs" IS included —
+  // it's a pure date comparison (today vs. expiry), not a guess.
   const today = new Date().toISOString().slice(0, 10);
+  const expiredPending = useMemo(
+    () => [...rows].filter((r) => r.isOverdue).sort((a, b) => (b.operationalDelayDays ?? 0) - (a.operationalDelayDays ?? 0)),
+    [rows]
+  );
   const expiringSoon = useMemo(
-    () => [...rows].filter((r) => r.daysRemaining <= 3).sort((a, b) => a.daysRemaining - b.daysRemaining).slice(0, 10),
+    () =>
+      [...rows]
+        .filter((r) => !r.isOverdue && r.daysRemaining <= 3)
+        .sort((a, b) => a.daysRemaining - b.daysRemaining)
+        .slice(0, 10),
     [rows]
   );
   const dispatchToday = useMemo(
@@ -129,13 +140,37 @@ export function PoControlTower({ rows, marketplaces, hasRules }: Props) {
 
       {!hasRules && (
         <div className="animate-fade-in rounded-2xl border border-amber-300/60 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
-          No rules are published yet, so Priority Score/Level/Rules Triggered/Recommended Action
-          are honestly empty below (0 / Unscored / — ) rather than guessed. Sorting and filtering
-          on real fields (expiry, value, qty, SLA%, delay) work today.
+          Only 5 rules are published so far, so Priority Score/Level/Rules Triggered/Recommended
+          Action reflect just those — every already-overdue PO is still guaranteed Critical (see
+          Expired Pending POs below), independent of the rest of the rule set.
         </div>
       )}
 
-      <SectionRow title="Expiring Soon (≤ 3 days)" rows={expiringSoon} onSelect={setSelected} />
+      {expiredPending.length > 0 && (
+        <div className="animate-fade-in-up rounded-card border-l-4 border-l-[#d03b3b] bg-[#d03b3b]/[0.04] p-4 shadow-sm dark:bg-[#d03b3b]/10">
+          <h3 className="flex items-center gap-1.5 text-sm font-semibold text-[#9a2c2c] dark:text-[#ff9d9d]">
+            <AlertTriangle size={15} className="animate-pulse" />
+            Expired Pending POs <span className="font-normal text-neutral-500">({expiredPending.length})</span>
+          </h3>
+          <p className="mt-0.5 text-xs text-neutral-500">
+            Already past their own expiry date and still not Delivered — highest priority, almost always Critical.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {expiredPending.slice(0, 12).map((r) => (
+              <button
+                key={r.po.id}
+                onClick={() => setSelected(r)}
+                className="card-elevate rounded-xl border border-[#d03b3b]/30 bg-white px-3 py-1.5 text-left text-xs shadow-sm dark:bg-neutral-900"
+              >
+                <div className="font-medium">{r.po.id}</div>
+                <div className="text-[#d03b3b]">{formatOperationalDelay(r.operationalDelayDays)}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <SectionRow title="Expiring Soon (≤ 3 days, not yet overdue)" rows={expiringSoon} onSelect={setSelected} />
       <SectionRow title="Today's Dispatch Queue (appointment today)" rows={dispatchToday} onSelect={setSelected} />
       <SectionRow title="Delayed Appointments" rows={delayedAppointments.slice(0, 10)} onSelect={setSelected} />
       <SectionRow title="Metro City Queue" rows={metroQueue.slice(0, 10)} onSelect={setSelected} />
@@ -160,6 +195,15 @@ export function PoControlTower({ rows, marketplaces, hasRules }: Props) {
           <option value="metro">Metro only</option>
           <option value="non-metro">Non-metro only</option>
         </select>
+        <label className="flex items-center gap-1.5 rounded-xl border border-frido-border px-3 py-1.5 text-sm shadow-sm dark:border-white/10">
+          <input
+            type="checkbox"
+            checked={overdueOnly}
+            onChange={(e) => setOverdueOnly(e.target.checked)}
+            className="accent-[#d03b3b]"
+          />
+          Overdue only
+        </label>
         <label className="flex items-center gap-1.5 rounded-xl border border-frido-border px-3 py-1.5 text-sm shadow-sm dark:border-white/10">
           <input
             type="checkbox"
@@ -197,7 +241,7 @@ export function PoControlTower({ rows, marketplaces, hasRules }: Props) {
 
       <div className="glass-card overflow-hidden rounded-card shadow-sm">
         <div className="max-h-[640px] overflow-auto">
-          <table className="w-full min-w-[1600px] text-left text-sm">
+          <table className="w-full min-w-[1650px] text-left text-sm">
             <thead className="sticky top-0 z-10 bg-white/95 text-xs uppercase tracking-wide text-neutral-500 backdrop-blur dark:bg-neutral-900/95">
               <tr className="border-b border-frido-border dark:border-white/10">
                 {[
@@ -212,9 +256,8 @@ export function PoControlTower({ rows, marketplaces, hasRules }: Props) {
                   "Appt Date",
                   "Pending Qty",
                   "PO Value",
-                  "Days Left",
-                  "SLA %",
-                  "Delay",
+                  "Operational Delay",
+                  "Appt Delay",
                   "Metro",
                   "Rules Triggered",
                   "Recommended Action",
@@ -235,17 +278,26 @@ export function PoControlTower({ rows, marketplaces, hasRules }: Props) {
                 <tr
                   key={r.po.id}
                   onClick={() => setSelected(r)}
-                  className="group cursor-pointer transition-colors hover:bg-[var(--mp-primary)]/[0.06]"
+                  className={`group cursor-pointer transition-colors hover:bg-[var(--mp-primary)]/[0.06] ${
+                    r.isOverdue ? "border-l-4 border-l-[#d03b3b]" : ""
+                  }`}
                 >
                   <td className="px-3 py-2.5 text-neutral-500">{r.rank || "—"}</td>
                   <td className="px-3 py-2.5 tabular-nums font-medium">{r.score}</td>
                   <td className="px-3 py-2.5">
-                    <PriorityBadge level={r.level} />
+                    <div className="flex items-center gap-1.5">
+                      <PriorityBadge level={r.level} />
+                      {r.isOverdue && <AlertTriangle size={13} className="animate-pulse text-[#d03b3b]" />}
+                    </div>
                   </td>
                   <td className="px-3 py-2.5">
                     <MarketplaceBadge marketplace={r.po.marketplace} />
                   </td>
-                  <td className="sticky left-0 z-[1] bg-white px-3 py-2.5 font-medium transition-colors group-hover:bg-[#fbf9f2] dark:bg-neutral-900 dark:group-hover:bg-neutral-800">
+                  <td
+                    className={`sticky left-0 z-[1] bg-white px-3 py-2.5 font-medium transition-colors group-hover:bg-[#fbf9f2] dark:bg-neutral-900 dark:group-hover:bg-neutral-800 ${
+                      r.isOverdue ? "border-l-4 border-l-[#d03b3b]" : ""
+                    }`}
+                  >
                     {r.po.id}
                   </td>
                   <td className="px-3 py-2.5">{r.po.city}</td>
@@ -254,11 +306,8 @@ export function PoControlTower({ rows, marketplaces, hasRules }: Props) {
                   <td className="px-3 py-2.5 whitespace-nowrap text-neutral-500">{fmtDate(r.po.appointmentDate)}</td>
                   <td className="px-3 py-2.5 tabular-nums">{r.po.pendingQty.toLocaleString("en-IN")}</td>
                   <td className="px-3 py-2.5 tabular-nums">{fmtCurrency(r.po.poValue)}</td>
-                  <td className={`px-3 py-2.5 tabular-nums ${r.daysRemaining <= 2 ? "font-semibold text-[#d03b3b]" : ""}`}>
-                    {r.daysRemaining}
-                  </td>
                   <td className="px-3 py-2.5">
-                    <SlaBar percent={r.slaConsumedPercent} />
+                    <OperationalDelayBadge days={r.operationalDelayDays} />
                   </td>
                   <td className="px-3 py-2.5 tabular-nums">
                     {r.appointmentDelayDays === null ? "—" : `${r.appointmentDelayDays}d`}

@@ -11,10 +11,49 @@ import { Rule } from "@/types/rules";
 // on data): Inventory Risk / "PO Value < 25000 AND Inventory Low" (both
 // depend on the deferred Inventory tab), Warehouse=Mumbai AND Pending
 // Qty>1000 (Warehouse Risk — score not yet confirmed), Supplier rules
-// (dropped — no supplier concept in this data).
+// (dropped — no supplier concept in this data), Expiry-approaching /
+// High-Value / High-Qty / Marketplace-priority as standalone rules (no
+// confirmed numbers yet beyond what's already seeded below).
 const now = "2026-07-21T00:00:00.000Z";
 
 export const SEED_RULES: Rule[] = [
+  // Evaluated first (lowest order): a PO that's already past its own
+  // expiry date and still not Delivered is an operational failure the
+  // company has already missed its commitment on — this alone crosses
+  // the Critical threshold (>=80) regardless of what else applies, per
+  // the confirmed "should override almost every other rule" behavior.
+  // Modeled as a very large accumulate score (not a rule-forced level —
+  // level stays purely score-derived, per the earlier confirmed design)
+  // and does NOT stop lower rules, so Metro/Appointment reasons still
+  // stack into the same explanation.
+  {
+    id: "seed-expired-pending",
+    name: "Expired Pending PO",
+    description:
+      "PO has passed its own expiry date and is still not Delivered — SLA % was retired in favor of this.",
+    enabled: true,
+    order: 5,
+    groupId: null,
+    scope: { marketplaces: "all" },
+    conditions: {
+      id: "seed-expired-pending-root",
+      join: "AND",
+      children: [{ id: "seed-expired-pending-c1", field: "isOverdue", operator: "equals", value: true }],
+    },
+    action: {
+      scoreMode: "accumulate",
+      scoreDelta: 100,
+      addFlags: ["Expired Pending"],
+      reason: "PO has passed its expiry date and is still outstanding",
+      recommendedAction:
+        "Immediate dispatch required. Escalate to warehouse and marketplace operations — high risk of cancellation or penalty.",
+    },
+    onMatch: "continue",
+    createdAt: now,
+    updatedAt: now,
+    createdBy: "system",
+    version: 1,
+  },
   {
     id: "seed-metro-bonus",
     name: "Metro City Bonus",
@@ -44,7 +83,7 @@ export const SEED_RULES: Rule[] = [
   {
     id: "seed-metro-near-expiry",
     name: "Metro City Nearing Expiry",
-    description: "Metro city PO with 2 days or less remaining before expiry.",
+    description: "Metro city PO with 0-2 days remaining before expiry (not yet overdue — see Expired Pending PO for that).",
     enabled: true,
     order: 20,
     groupId: null,
@@ -55,6 +94,7 @@ export const SEED_RULES: Rule[] = [
       children: [
         { id: "seed-metro-near-expiry-c1", field: "isMetroCity", operator: "equals", value: true },
         { id: "seed-metro-near-expiry-c2", field: "daysRemaining", operator: "less_than_or_equal", value: 2 },
+        { id: "seed-metro-near-expiry-c3", field: "daysRemaining", operator: "greater_than_or_equal", value: 0 },
       ],
     },
     action: {
@@ -63,35 +103,6 @@ export const SEED_RULES: Rule[] = [
       addFlags: [],
       reason: "Metro city nearing expiry",
       recommendedAction: "Dispatch immediately — expires within 2 days in a metro city.",
-    },
-    onMatch: "continue",
-    createdAt: now,
-    updatedAt: now,
-    createdBy: "system",
-    version: 1,
-  },
-  {
-    id: "seed-sla-breach",
-    name: "SLA Breach Risk",
-    description: "SLA already over 80% consumed with a large pending quantity.",
-    enabled: true,
-    order: 30,
-    groupId: null,
-    scope: { marketplaces: "all" },
-    conditions: {
-      id: "seed-sla-breach-root",
-      join: "AND",
-      children: [
-        { id: "seed-sla-breach-c1", field: "slaConsumedPercent", operator: "greater_than", value: 80 },
-        { id: "seed-sla-breach-c2", field: "pendingQty", operator: "greater_than", value: 50 },
-      ],
-    },
-    action: {
-      scoreMode: "accumulate",
-      scoreDelta: 50,
-      addFlags: ["SLA Risk"],
-      reason: "SLA already over 80% consumed with high pending quantity",
-      recommendedAction: "Escalate — SLA breach risk with large pending quantity.",
     },
     onMatch: "continue",
     createdAt: now,
@@ -146,8 +157,8 @@ export const SEED_RULES: Rule[] = [
     action: {
       scoreMode: "accumulate",
       scoreDelta: 25,
-      addFlags: ["Operational Delay"],
-      reason: "Appointment scheduled more than 2 days late",
+      addFlags: ["Appointment Scheduled Late"],
+      reason: "Appointment scheduled more than 2 days past expiry",
       recommendedAction: "Flag for operations follow-up — appointment delay compounding risk.",
     },
     onMatch: "continue",

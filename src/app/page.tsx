@@ -1,16 +1,18 @@
 import {
   Package,
   AlertOctagon,
+  AlertTriangle,
   Flame,
   Gauge,
   CircleSlash,
   CalendarClock,
+  CalendarDays,
   CalendarX2,
   Boxes,
   Wallet,
   Truck,
   Clock,
-  Percent,
+  Hourglass,
 } from "lucide-react";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { AwaitingConfig } from "@/components/dashboard/awaiting-config";
@@ -38,9 +40,6 @@ function fmtDays(n: number | null): string {
   return n === null ? "—" : `${n.toFixed(1)}d`;
 }
 
-function fmtPercent(n: number | null): string {
-  return n === null ? "—" : `${n.toFixed(0)}%`;
-}
 
 export default async function OverviewPage() {
   let errorMessage: string | null = null;
@@ -92,18 +91,25 @@ export default async function OverviewPage() {
         ) : summary ? (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             <KpiCard label="Total Active PO (Pending)" value={fmtNumber(summary.totalActive)} icon={Package} tone="accent" />
+            <KpiCard label="Expired Pending POs" value={fmtNumber(summary.expiredPending)} icon={AlertTriangle} tone="critical" />
             <KpiCard label="Critical" value={fmtNumber(summary.critical)} icon={AlertOctagon} tone="critical" />
             <KpiCard label="High" value={fmtNumber(summary.high)} icon={Flame} tone="high" />
             <KpiCard label="Medium" value={fmtNumber(summary.medium)} icon={Gauge} tone="medium" />
             <KpiCard label="Low" value={fmtNumber(summary.low)} icon={Gauge} tone="low" />
             <KpiCard label="Unscored" value={fmtNumber(summary.unscored)} icon={CircleSlash} />
-            <KpiCard label="Expired" value={fmtNumber(summary.expired)} icon={CalendarX2} tone="critical" />
+            <KpiCard label="Expired (Status)" value={fmtNumber(summary.expired)} icon={CalendarX2} tone="critical" />
             <KpiCard label="Expiring Today" value={fmtNumber(summary.expiringToday)} icon={CalendarClock} tone="high" />
+            <KpiCard label="Expiring Tomorrow" value={fmtNumber(summary.expiringTomorrow)} icon={CalendarDays} tone="medium" />
             <KpiCard label="Pending Qty" value={fmtNumber(summary.pendingQty)} icon={Boxes} />
             <KpiCard label="Pending Value" value={fmtCurrency(summary.pendingValue)} icon={Wallet} />
             <KpiCard label="Avg Dispatch Time" value={fmtDays(summary.avgDispatchTimeDays)} icon={Truck} />
             <KpiCard label="Avg Appointment Delay" value={fmtDays(summary.avgAppointmentDelayDays)} icon={Clock} />
-            <KpiCard label="Avg SLA Consumption" value={fmtPercent(summary.avgSlaConsumedPercent)} icon={Percent} />
+            <KpiCard
+              label="Avg Days Late (overdue)"
+              value={summary.avgOperationalDelayDaysLate === null ? "—" : `${summary.avgOperationalDelayDaysLate.toFixed(1)}d`}
+              icon={Hourglass}
+              tone="critical"
+            />
           </div>
         ) : null}
 

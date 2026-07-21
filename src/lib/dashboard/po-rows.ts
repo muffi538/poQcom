@@ -16,8 +16,11 @@ export interface PoRow {
   score: number;
   level: "Critical" | "High" | "Medium" | "Low" | "Unscored";
   daysRemaining: number;
-  slaConsumedPercent: number;
+  operationalDelayDays: number | null; // today − expiry; positive = days late
+  isOverdue: boolean;
+  hasDataError: boolean;
   appointmentDelayDays: number | null;
+  appointmentScheduledTooLate: boolean;
   isMetroCity: boolean;
   flags: string[];
   rulesTriggered: string[]; // rule names, not just ids
@@ -43,8 +46,11 @@ export function buildPoRows(
       score: priority.score,
       level: priority.level,
       daysRemaining: timeline.daysRemaining,
-      slaConsumedPercent: timeline.slaConsumedPercent,
+      operationalDelayDays: timeline.operationalDelayDays,
+      isOverdue: timeline.isOverdue,
+      hasDataError: timeline.hasDataError,
       appointmentDelayDays: timeline.appointmentDelayDays,
+      appointmentScheduledTooLate: timeline.appointmentScheduledTooLate,
       isMetroCity: timeline.isMetroCity,
       flags: priority.flags,
       rulesTriggered: priority.appliedRuleIds.map((id) => rulesById.get(id)?.name ?? id),

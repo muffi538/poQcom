@@ -1,14 +1,40 @@
 "use client";
 
-import { X, Sparkles, Flag, ArrowRight, PackageSearch } from "lucide-react";
+import { X, Sparkles, Flag, ArrowRight, PackageSearch, AlertTriangle } from "lucide-react";
 import { PoRow } from "@/lib/dashboard/po-rows";
 import { PriorityBadge } from "./priority-badge";
 import { StatusBadge } from "./status-badge";
 import { MarketplaceBadge } from "./marketplace-badge";
+import { formatOperationalDelay } from "./operational-delay";
 import { fmtDate, fmtCurrency } from "./po-format";
+
+// Always-real, rule-independent facts about why this PO ranks where it
+// does — combined with the rule-triggered explanation below so the panel
+// never shows just a bare number. Every line here comes straight from
+// computed fields, nothing invented.
+function buildFactualHighlights(row: PoRow): string[] {
+  const lines: string[] = [];
+  if (row.isOverdue) {
+    lines.push(`PO expired ${formatOperationalDelay(row.operationalDelayDays).replace(" Late", " ago")}`);
+    lines.push(`Status is still "${row.po.status}"`);
+  }
+  lines.push(`Operational Delay: ${formatOperationalDelay(row.operationalDelayDays)}`);
+  lines.push(`${row.po.city} FC${row.isMetroCity ? " (Metro)" : ""}`);
+  lines.push(`Qty: ${row.po.pendingQty.toLocaleString("en-IN")}`);
+  if (row.po.poValue !== null) lines.push(`Value: ${formatLakh(row.po.poValue)}`);
+  if (row.appointmentScheduledTooLate) lines.push("Appointment scheduled after the PO's own expiry date");
+  if (row.hasDataError) lines.push("Data error: PO Raised Date is after Expiry Date");
+  return lines;
+}
+
+function formatLakh(value: number): string {
+  if (value >= 100000) return `₹${(value / 100000).toFixed(1)}L`;
+  return `₹${Math.round(value).toLocaleString("en-IN")}`;
+}
 
 export function PoDetailPanel({ row, onClose }: { row: PoRow; onClose: () => void }) {
   const lineItems = (row.po.raw.lineItems as Array<{ sku: string; skuDescription: string; orderedQty: number }>) ?? [];
+  const highlights = buildFactualHighlights(row);
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-[2px]" onClick={onClose}>
@@ -22,6 +48,11 @@ export function PoDetailPanel({ row, onClose }: { row: PoRow; onClose: () => voi
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
               <MarketplaceBadge marketplace={row.po.marketplace} />
               <StatusBadge status={row.po.status} />
+              {row.isOverdue && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-[#d03b3b]/10 px-2.5 py-1 text-xs font-semibold text-[#9a2c2c] dark:text-[#ff9d9d]">
+                  <AlertTriangle size={12} className="animate-pulse" /> Expired
+                </span>
+              )}
             </div>
             <p className="mt-1 text-sm text-neutral-500">
               {row.po.city} · {row.po.warehouse}
@@ -45,10 +76,13 @@ export function PoDetailPanel({ row, onClose }: { row: PoRow; onClose: () => voi
           <Field label="Expiry Date" value={fmtDate(row.po.expiryDate)} />
           <Field label="Appointment Date" value={fmtDate(row.po.appointmentDate)} />
           <Field label="Dispatch Date" value={fmtDate(row.po.dispatchDate)} />
-          <Field label="Days Remaining" value={String(row.daysRemaining)} />
-          <Field label="SLA Consumed" value={`${row.slaConsumedPercent.toFixed(0)}%`} />
           <Field
             label="Operational Delay"
+            value={formatOperationalDelay(row.operationalDelayDays)}
+            emphasize={row.isOverdue}
+          />
+          <Field
+            label="Appt. vs Expiry Delay"
             value={row.appointmentDelayDays === null ? "—" : `${row.appointmentDelayDays}d`}
           />
           <Field label="Metro City" value={row.isMetroCity ? "Yes" : "No"} />
@@ -57,6 +91,21 @@ export function PoDetailPanel({ row, onClose }: { row: PoRow; onClose: () => voi
           <Field label="Pending Qty" value={row.po.pendingQty.toLocaleString("en-IN")} />
           <Field label="PO Value" value={fmtCurrency(row.po.poValue)} />
         </dl>
+
+        {(row.hasDataError || row.appointmentScheduledTooLate) && (
+          <div className="mt-3 space-y-1.5">
+            {row.hasDataError && (
+              <p className="rounded-xl bg-[#fab219]/15 px-3 py-2 text-xs font-medium text-[#8a5c00] dark:text-[#ffd479]">
+                ⚠ Data error: PO Raised Date is after Expiry Date
+              </p>
+            )}
+            {row.appointmentScheduledTooLate && (
+              <p className="rounded-xl bg-[#fab219]/15 px-3 py-2 text-xs font-medium text-[#8a5c00] dark:text-[#ffd479]">
+                ⚠ Appointment scheduled too late — after the PO&apos;s own expiry date
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="mt-6">
           <h3 className="flex items-center gap-1.5 text-sm font-semibold">
@@ -80,17 +129,18 @@ export function PoDetailPanel({ row, onClose }: { row: PoRow; onClose: () => voi
             <Sparkles size={15} className="text-neutral-400" />
             Why this priority
           </h3>
-          {row.explanation.length > 0 ? (
-            <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-neutral-600 dark:text-neutral-400">
-              {row.explanation.map((line, i) => (
-                <li key={i}>{line}</li>
-              ))}
-            </ul>
-          ) : (
+          <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-neutral-600 dark:text-neutral-400">
+            {highlights.map((line, i) => (
+              <li key={`fact-${i}`}>{line}</li>
+            ))}
+            {row.explanation.map((line, i) => (
+              <li key={`rule-${i}`}>{line}</li>
+            ))}
+          </ul>
+          {row.explanation.length === 0 && !row.isOverdue && (
             <p className="mt-2 text-sm text-neutral-500">
-              {row.level === "Unscored" && row.rulesTriggered.length === 0
-                ? "No rules matched this PO (or this status isn't run through the priority chain yet)."
-                : "No rules matched this PO — publish rules in the Rules Builder to see an explanation here."}
+              No score-affecting rules matched beyond the facts above — publish more rules in the
+              Rules Builder for a fuller picture.
             </p>
           )}
         </div>
@@ -125,11 +175,11 @@ export function PoDetailPanel({ row, onClose }: { row: PoRow; onClose: () => voi
   );
 }
 
-function Field({ label, value }: { label: string; value: string }) {
+function Field({ label, value, emphasize }: { label: string; value: string; emphasize?: boolean }) {
   return (
     <div>
       <dt className="text-xs uppercase tracking-wide text-neutral-500">{label}</dt>
-      <dd className="font-medium">{value}</dd>
+      <dd className={`font-medium ${emphasize ? "text-[#d03b3b]" : ""}`}>{value}</dd>
     </div>
   );
 }

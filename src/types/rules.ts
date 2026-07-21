@@ -10,7 +10,7 @@ export type FieldType = "string" | "number" | "boolean" | "date" | "enum";
 // builder. It will be generated from the real sheet columns once the
 // column mapping is confirmed (see Settings > Field Mapping).
 export interface FieldDefinition {
-  key: string; // e.g. "marketplace", "slaConsumedPercent"
+  key: string; // e.g. "marketplace", "operationalDelayDays"
   label: string; // e.g. "Marketplace"
   type: FieldType;
   enumOptions?: string[]; // for type "enum", e.g. marketplace names
