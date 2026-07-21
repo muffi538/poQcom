@@ -1,16 +1,19 @@
 import { notFound } from "next/navigation";
+import { Package, Boxes, Truck, Clock, Percent, ShieldAlert } from "lucide-react";
 import { MARKETPLACES } from "@/types/marketplace";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { AwaitingConfig } from "@/components/dashboard/awaiting-config";
 import { PoControlTower } from "@/components/dashboard/po-control-tower";
 import { PoCharts } from "@/components/dashboard/po-charts";
 import { SecondaryPoTable } from "@/components/dashboard/secondary-po-table";
+import { MarketplaceThemeScope } from "@/components/theme/marketplace-theme-scope";
 import { fetchPurchaseOrders, SupportedMarketplace } from "@/lib/sheets/marketplaces";
 import { listRules } from "@/lib/rules/storage";
 import { getEngineConfig } from "@/lib/config/store";
 import { buildExecutiveSummary } from "@/lib/dashboard/summary";
 import { buildPoRows } from "@/lib/dashboard/po-rows";
 import { classifyStatus, isTerminalStatus, isLowValueCantDispatch } from "@/types/purchase-order";
+import { themeFor } from "@/lib/theme/marketplace-colors";
 
 export function generateStaticParams() {
   return MARKETPLACES.map((m) => ({ marketplace: m.toLowerCase() }));
@@ -63,35 +66,42 @@ export default async function MarketplacePage({
     errorMessage = err instanceof Error ? err.message : "Failed to load PO data.";
   }
 
+  const theme = themeFor(marketplace);
+
   return (
-    <div className="space-y-6">
-      <h1 className="text-xl font-semibold">{marketplace}</h1>
-
-      {errorMessage ? (
-        <AwaitingConfig title={`${marketplace} PO table`} items={[errorMessage]} />
-      ) : summary ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <KpiCard label="Pending Orders" value={summary.totalActive} />
-          <KpiCard label="Pending Qty" value={summary.pendingQty} />
-          <KpiCard label="Avg Dispatch Time" value={fmtDays(summary.avgDispatchTimeDays)} />
-          <KpiCard label="Avg Appointment Delay" value={fmtDays(summary.avgAppointmentDelayDays)} />
-          <KpiCard label="SLA %" value={fmtPercent(summary.avgSlaConsumedPercent)} />
-          <KpiCard label="Risk (Critical + High)" value={summary.critical + summary.high} />
+    <MarketplaceThemeScope marketplace={marketplace}>
+      <div className="space-y-6">
+        <div className="flex items-center gap-3">
+          <span className="h-3 w-3 rounded-full" style={{ backgroundColor: theme.primary }} />
+          <h1 className="text-2xl font-semibold tracking-tight">{marketplace}</h1>
         </div>
-      ) : null}
 
-      {!errorMessage && (
-        <>
-          <PoControlTower rows={pendingRows} marketplaces={[marketplace]} hasRules={hasRules} />
-          <SecondaryPoTable title="Expired POs" rows={expiredRows} />
-          <SecondaryPoTable
-            title="Needs Review — status not yet classified"
-            note="Price issue, Scheduled, Revised appt. required, etc. — not run through priority scoring until confirmed how they should be handled."
-            rows={needsReviewRows}
-          />
-          <PoCharts rows={pendingRows} />
-        </>
-      )}
-    </div>
+        {errorMessage ? (
+          <AwaitingConfig title={`${marketplace} PO table`} items={[errorMessage]} />
+        ) : summary ? (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            <KpiCard label="Pending Orders" value={summary.totalActive} icon={Package} tone="accent" />
+            <KpiCard label="Pending Qty" value={summary.pendingQty} icon={Boxes} tone="accent" />
+            <KpiCard label="Avg Dispatch Time" value={fmtDays(summary.avgDispatchTimeDays)} icon={Truck} tone="accent" />
+            <KpiCard label="Avg Appointment Delay" value={fmtDays(summary.avgAppointmentDelayDays)} icon={Clock} tone="accent" />
+            <KpiCard label="SLA %" value={fmtPercent(summary.avgSlaConsumedPercent)} icon={Percent} tone="accent" />
+            <KpiCard label="Risk (Critical + High)" value={summary.critical + summary.high} icon={ShieldAlert} tone="critical" />
+          </div>
+        ) : null}
+
+        {!errorMessage && (
+          <>
+            <PoControlTower rows={pendingRows} marketplaces={[marketplace]} hasRules={hasRules} />
+            <SecondaryPoTable title="Expired POs" rows={expiredRows} />
+            <SecondaryPoTable
+              title="Needs Review — status not yet classified"
+              note="Price issue, Scheduled, Revised appt. required, etc. — not run through priority scoring until confirmed how they should be handled."
+              rows={needsReviewRows}
+            />
+            <PoCharts rows={pendingRows} accentHex={theme.primary} />
+          </>
+        )}
+      </div>
+    </MarketplaceThemeScope>
   );
 }

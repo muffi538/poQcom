@@ -6,10 +6,21 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        critical: "#dc2626",
-        high: "#ea580c",
-        medium: "#ca8a04",
-        low: "#16a34a",
+        critical: "#d03b3b",
+        high: "#ec835a",
+        medium: "#fab219",
+        low: "#0ca30c",
+        frido: {
+          yellow: "#FFD400",
+          bg: "#F8F9FA",
+          border: "#ECECEC",
+        },
+      },
+      fontFamily: {
+        sans: ["var(--font-inter)", "system-ui", "-apple-system", "sans-serif"],
+      },
+      borderRadius: {
+        card: "18px",
       },
     },
   },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 // A single horizontal bar chart, reused for every "magnitude by category"
 // chart in the control tower (PO Value by Marketplace, Pending Qty by
@@ -24,16 +24,22 @@ interface Props {
 const DEFAULT_HUE = { light: "#2a78d6", dark: "#3987e5" };
 
 export function BarChart({ title, data, colorMap, defaultColor = DEFAULT_HUE, valueFormatter }: Props) {
-  const uid = useId();
+  const uid = useId().replace(/[:]/g, "");
   const [hovered, setHovered] = useState<number | null>(null);
+  const [grown, setGrown] = useState(false);
   const max = Math.max(1, ...data.map((d) => d.value));
-  const rowHeight = 28;
+  const rowHeight = 30;
   const chartHeight = data.length * rowHeight + 8;
   const fmt = valueFormatter ?? ((n: number) => n.toLocaleString("en-IN"));
 
+  useEffect(() => {
+    const t = requestAnimationFrame(() => setGrown(true));
+    return () => cancelAnimationFrame(t);
+  }, []);
+
   if (data.length === 0) {
     return (
-      <div className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
+      <div className="glass-card rounded-card p-4 shadow-sm">
         <h3 className="text-sm font-semibold">{title}</h3>
         <p className="mt-4 text-sm text-neutral-500">No data.</p>
       </div>
@@ -41,7 +47,7 @@ export function BarChart({ title, data, colorMap, defaultColor = DEFAULT_HUE, va
   }
 
   return (
-    <div className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
+    <div className="glass-card card-elevate animate-fade-in rounded-card p-4 shadow-sm">
       <h3 className="text-sm font-semibold">{title}</h3>
       <svg
         viewBox={`0 0 400 ${chartHeight}`}
@@ -50,14 +56,26 @@ export function BarChart({ title, data, colorMap, defaultColor = DEFAULT_HUE, va
         role="img"
         aria-label={title}
       >
+        <defs>
+          {data.map((d, i) => {
+            const color = colorMap?.[d.label] ?? defaultColor;
+            return (
+              <linearGradient key={d.label} id={`${uid}-grad-${i}`} x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stopColor={color.light} stopOpacity={0.55} />
+                <stop offset="100%" stopColor={color.light} stopOpacity={1} />
+              </linearGradient>
+            );
+          })}
+        </defs>
         {data.map((d, i) => {
           const y = i * rowHeight;
-          const barMaxWidth = 260;
+          const barMaxWidth = 250;
           const barWidth = Math.max(2, (d.value / max) * barMaxWidth);
           const color = colorMap?.[d.label] ?? defaultColor;
           const isHovered = hovered === i;
           return (
             <g key={d.label} onMouseEnter={() => setHovered(i)} onMouseLeave={() => setHovered(null)}>
+              <rect x={110} y={y + 6} width={barMaxWidth} height={16} rx={4} className="fill-neutral-100 dark:fill-neutral-800/60" />
               <text
                 x={0}
                 y={y + rowHeight / 2 + 4}
@@ -68,27 +86,29 @@ export function BarChart({ title, data, colorMap, defaultColor = DEFAULT_HUE, va
               <rect
                 x={110}
                 y={y + 6}
-                width={barWidth}
+                width={grown ? barWidth : 0}
                 height={16}
                 rx={4}
-                className="dark:hidden"
-                fill={color.light}
-                opacity={isHovered ? 1 : 0.85}
+                className="dark:hidden transition-[width] duration-700 ease-out"
+                fill={`url(#${uid}-grad-${i})`}
+                opacity={isHovered ? 1 : 0.92}
               />
               <rect
                 x={110}
                 y={y + 6}
-                width={barWidth}
+                width={grown ? barWidth : 0}
                 height={16}
                 rx={4}
-                className="hidden dark:block"
+                className="hidden dark:block transition-[width] duration-700 ease-out"
                 fill={color.dark}
-                opacity={isHovered ? 1 : 0.85}
+                opacity={isHovered ? 1 : 0.92}
               />
               <text
                 x={110 + barWidth + 6}
                 y={y + rowHeight / 2 + 4}
-                className="fill-neutral-800 text-[11px] font-medium dark:fill-neutral-200"
+                className={`text-[11px] font-medium transition-opacity dark:fill-neutral-200 fill-neutral-800 ${
+                  grown ? "opacity-100" : "opacity-0"
+                }`}
               >
                 {fmt(d.value)}
               </text>
@@ -96,7 +116,6 @@ export function BarChart({ title, data, colorMap, defaultColor = DEFAULT_HUE, va
           );
         })}
       </svg>
-      <span className="sr-only">{`Chart id ${uid}`}</span>
     </div>
   );
 }

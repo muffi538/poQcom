@@ -1,37 +1,46 @@
 "use client";
 
+import { X, Sparkles, Flag, ArrowRight, PackageSearch } from "lucide-react";
 import { PoRow } from "@/lib/dashboard/po-rows";
 import { PriorityBadge } from "./priority-badge";
+import { StatusBadge } from "./status-badge";
+import { MarketplaceBadge } from "./marketplace-badge";
 import { fmtDate, fmtCurrency } from "./po-format";
 
 export function PoDetailPanel({ row, onClose }: { row: PoRow; onClose: () => void }) {
   const lineItems = (row.po.raw.lineItems as Array<{ sku: string; skuDescription: string; orderedQty: number }>) ?? [];
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/30" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-[2px]" onClick={onClose}>
       <div
-        className="h-full w-full max-w-lg overflow-y-auto bg-white p-6 dark:bg-neutral-900"
+        className="animate-fade-in-up h-full w-full max-w-lg overflow-y-auto rounded-l-3xl bg-white p-6 shadow-2xl dark:bg-neutral-900"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between">
           <div>
-            <h2 className="text-lg font-semibold">{row.po.id}</h2>
-            <p className="text-sm text-neutral-500">
-              {row.po.marketplace} · {row.po.city} · {row.po.warehouse}
+            <h2 className="text-lg font-semibold tracking-tight">{row.po.id}</h2>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <MarketplaceBadge marketplace={row.po.marketplace} />
+              <StatusBadge status={row.po.status} />
+            </div>
+            <p className="mt-1 text-sm text-neutral-500">
+              {row.po.city} · {row.po.warehouse}
             </p>
           </div>
-          <button onClick={onClose} className="text-neutral-500 hover:text-neutral-900 dark:hover:text-white">
-            ✕
+          <button
+            onClick={onClose}
+            className="rounded-full p-1.5 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-white"
+          >
+            <X size={18} />
           </button>
         </div>
 
-        <div className="mt-4">
+        <div className="mt-4 flex items-center gap-2">
           <PriorityBadge level={row.level} />
-          <span className="ml-2 text-sm text-neutral-500">Score {row.score}</span>
+          <span className="text-sm text-neutral-500">Score {row.score}</span>
         </div>
 
-        <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
-          <Field label="Status" value={row.po.status} />
+        <dl className="mt-5 grid grid-cols-2 gap-4 rounded-2xl bg-neutral-50 p-4 text-sm dark:bg-neutral-800/40">
           <Field label="PO Date" value={fmtDate(row.po.poRaisedDate)} />
           <Field label="Expiry Date" value={fmtDate(row.po.expiryDate)} />
           <Field label="Appointment Date" value={fmtDate(row.po.appointmentDate)} />
@@ -49,22 +58,28 @@ export function PoDetailPanel({ row, onClose }: { row: PoRow; onClose: () => voi
           <Field label="PO Value" value={fmtCurrency(row.po.poValue)} />
         </dl>
 
-        <div className="mt-5">
-          <h3 className="text-sm font-semibold">SKUs on this PO ({lineItems.length || 1})</h3>
-          <ul className="mt-2 space-y-1 text-sm text-neutral-600 dark:text-neutral-400">
+        <div className="mt-6">
+          <h3 className="flex items-center gap-1.5 text-sm font-semibold">
+            <PackageSearch size={15} className="text-neutral-400" />
+            SKUs on this PO ({lineItems.length || 1})
+          </h3>
+          <ul className="mt-2 space-y-1.5 text-sm text-neutral-600 dark:text-neutral-400">
             {(lineItems.length > 0
               ? lineItems
               : [{ sku: row.po.sku, skuDescription: row.po.skuDescription, orderedQty: row.po.orderedQty }]
             ).map((line, i) => (
-              <li key={i}>
+              <li key={i} className="rounded-lg bg-neutral-50 px-3 py-1.5 dark:bg-neutral-800/40">
                 {line.skuDescription} ({line.sku}) — qty {line.orderedQty}
               </li>
             ))}
           </ul>
         </div>
 
-        <div className="mt-5">
-          <h3 className="text-sm font-semibold">Why this priority</h3>
+        <div className="mt-6">
+          <h3 className="flex items-center gap-1.5 text-sm font-semibold">
+            <Sparkles size={15} className="text-neutral-400" />
+            Why this priority
+          </h3>
           {row.explanation.length > 0 ? (
             <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-neutral-600 dark:text-neutral-400">
               {row.explanation.map((line, i) => (
@@ -81,15 +96,27 @@ export function PoDetailPanel({ row, onClose }: { row: PoRow; onClose: () => voi
         </div>
 
         {row.flags.length > 0 && (
-          <div className="mt-5">
-            <h3 className="text-sm font-semibold">Flags</h3>
-            <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">{row.flags.join(", ")}</p>
+          <div className="mt-6">
+            <h3 className="flex items-center gap-1.5 text-sm font-semibold">
+              <Flag size={15} className="text-neutral-400" />
+              Flags
+            </h3>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {row.flags.map((f) => (
+                <span key={f} className="rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-medium dark:bg-neutral-800">
+                  {f}
+                </span>
+              ))}
+            </div>
           </div>
         )}
 
-        <div className="mt-5">
-          <h3 className="text-sm font-semibold">Recommended action</h3>
-          <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
+        <div className="mt-6 rounded-2xl bg-[var(--mp-primary)]/10 p-4">
+          <h3 className="flex items-center gap-1.5 text-sm font-semibold">
+            <ArrowRight size={15} />
+            Recommended action
+          </h3>
+          <p className="mt-1.5 text-sm text-neutral-700 dark:text-neutral-300">
             {row.recommendedAction ?? "No rule has set a recommended action for this PO yet."}
           </p>
         </div>

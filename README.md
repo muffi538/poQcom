@@ -69,6 +69,32 @@ not a demo.
   Done/Dispatched*/"Low Value Cant Dispatch" are excluded everywhere.
   "Needs Review" is real unclassified ground, not a guess — see below.
 
+## Design system
+
+Full visual redesign, no functional changes — same data/filters/sorting,
+new look:
+- **Inter** font, Frido brand identity on Overview/shared pages (yellow
+  `#FFD400` / black), collapsible sidebar with marketplace nav
+  (`src/components/layout/sidebar.tsx`).
+- **Per-marketplace theming** (`src/lib/theme/marketplace-colors.ts` +
+  `MarketplaceThemeScope`) — Zepto purple, Blinkit yellow/black, Instamart
+  orange (Flipkart/Myntra/Amazon/FBF/E-Trade colors seeded for later).
+  Visiting a marketplace page recolors its KPI icons, buttons, badges, and
+  single-series charts to that marketplace's brand color via CSS
+  variables (`--mp-primary` / `--mp-accent`) — no per-component branching.
+- Glass-style cards (`.glass-card`, `.card-elevate` in `globals.css`),
+  rounded-18px corners, hover lift, soft shadows.
+- Gradient/animated bar charts, sticky table header + first column,
+  marketplace/status/priority pill badges, inline SLA progress bars.
+- Lucide icons throughout; loading skeletons (`app/loading.tsx`,
+  `marketplaces/[marketplace]/loading.tsx`) for the data-fetching routes.
+- Dark mode unchanged in behavior (already `prefers-color-scheme`-based)
+  but restyled to match — charcoal, not pure black.
+- Deliberately not built in this pass (real functionality, not just
+  styling, so out of scope for "don't change functionality"): saved
+  views, column pinning, CSV/PDF export, expandable rows. Flag if you
+  want those built next.
+
 ## Where the Google Sheet link goes
 
 `.env` (copy from `.env.example`) — already pre-filled with your sheet's
