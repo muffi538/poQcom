@@ -4,12 +4,13 @@ import { KpiCard } from "@/components/dashboard/kpi-card";
 import { AwaitingConfig } from "@/components/dashboard/awaiting-config";
 import { PoControlTower } from "@/components/dashboard/po-control-tower";
 import { PoCharts } from "@/components/dashboard/po-charts";
+import { SecondaryPoTable } from "@/components/dashboard/secondary-po-table";
 import { fetchPurchaseOrders, SupportedMarketplace } from "@/lib/sheets/marketplaces";
 import { listRules } from "@/lib/rules/storage";
 import { getEngineConfig } from "@/lib/config/store";
 import { buildExecutiveSummary } from "@/lib/dashboard/summary";
 import { buildPoRows } from "@/lib/dashboard/po-rows";
-import { isTerminalStatus } from "@/types/purchase-order";
+import { classifyStatus, isTerminalStatus, isLowValueCantDispatch } from "@/types/purchase-order";
 
 export function generateStaticParams() {
   return MARKETPLACES.map((m) => ({ marketplace: m.toLowerCase() }));
@@ -36,7 +37,9 @@ export default async function MarketplacePage({
 
   let errorMessage: string | null = null;
   let summary: Awaited<ReturnType<typeof buildExecutiveSummary>> | null = null;
-  let rows: ReturnType<typeof buildPoRows> = [];
+  let pendingRows: ReturnType<typeof buildPoRows> = [];
+  let expiredRows: ReturnType<typeof buildPoRows> = [];
+  let needsReviewRows: ReturnType<typeof buildPoRows> = [];
   let hasRules = false;
 
   try {
@@ -45,10 +48,17 @@ export default async function MarketplacePage({
       listRules(),
       getEngineConfig(),
     ]);
-    summary = buildExecutiveSummary(pos, rules, config);
-    const activePos = pos.filter((po) => !isTerminalStatus(po.status));
-    rows = buildPoRows(activePos, rules, config);
     hasRules = rules.some((r) => r.enabled);
+
+    const visiblePos = pos.filter((po) => !isTerminalStatus(po.status) && !isLowValueCantDispatch(po.status));
+    const pendingPos = visiblePos.filter((po) => classifyStatus(po.status) === "pending");
+    const expiredPos = visiblePos.filter((po) => classifyStatus(po.status) === "expired");
+    const needsReviewPos = visiblePos.filter((po) => classifyStatus(po.status) === "needs_review");
+
+    summary = buildExecutiveSummary(visiblePos, rules, config);
+    pendingRows = buildPoRows(pendingPos, rules, config);
+    expiredRows = buildPoRows(expiredPos, rules, config);
+    needsReviewRows = buildPoRows(needsReviewPos, rules, config);
   } catch (err) {
     errorMessage = err instanceof Error ? err.message : "Failed to load PO data.";
   }
@@ -72,8 +82,14 @@ export default async function MarketplacePage({
 
       {!errorMessage && (
         <>
-          <PoControlTower rows={rows} marketplaces={[marketplace]} hasRules={hasRules} />
-          <PoCharts rows={rows} />
+          <PoControlTower rows={pendingRows} marketplaces={[marketplace]} hasRules={hasRules} />
+          <SecondaryPoTable title="Expired POs" rows={expiredRows} />
+          <SecondaryPoTable
+            title="Needs Review — status not yet classified"
+            note="Price issue, Scheduled, Revised appt. required, etc. — not run through priority scoring until confirmed how they should be handled."
+            rows={needsReviewRows}
+          />
+          <PoCharts rows={pendingRows} />
         </>
       )}
     </div>

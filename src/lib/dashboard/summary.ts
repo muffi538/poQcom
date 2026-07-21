@@ -1,4 +1,4 @@
-import { PurchaseOrder, isTerminalStatus } from "@/types/purchase-order";
+import { PurchaseOrder, isPendingStatus, isExpiredStatus } from "@/types/purchase-order";
 import { Rule } from "@/types/rules";
 import { EngineConfig } from "@/lib/config/store";
 import { computeTimeline } from "@/lib/po/derived";
@@ -26,18 +26,19 @@ function average(values: number[]): number | null {
   return values.reduce((a, b) => a + b, 0) / values.length;
 }
 
+// `pos` is expected to already exclude terminal statuses and "Low Value
+// Cant Dispatch" (the caller filters those out before calling — see
+// classifyStatus). Priority scoring, pending qty/value, expiring-today,
+// and SLA% only run over Status = "Pending" (confirmed: only Pending goes
+// through the priority chain) — Expired POs get their own count/section
+// instead of being scored alongside Pending ones.
 export function buildExecutiveSummary(
   pos: PurchaseOrder[],
   rules: Rule[],
   config: EngineConfig,
   today: Date = new Date()
 ): ExecutiveSummary {
-  // Priority, pending-qty/value, and SLA%25 are about what's still
-  // outstanding, so they're computed over active (non-terminal) POs only.
-  // Avg Dispatch Time and Avg Appointment Delay look backward at whatever
-  // POs actually have those dates, active or not, so they're computed
-  // over the full set.
-  const activePos = pos.filter((po) => !isTerminalStatus(po.status));
+  const pendingPos = pos.filter((po) => isPendingStatus(po.status));
 
   const dispatchTimes: number[] = [];
   const appointmentDelays: number[] = [];
@@ -52,7 +53,7 @@ export function buildExecutiveSummary(
     pendingQty = 0,
     pendingValue = 0;
 
-  for (const po of activePos) {
+  for (const po of pendingPos) {
     const timeline = computeTimeline(po, config, today);
     const priority = computePoPriority(po, rules, config, today);
 
@@ -83,6 +84,9 @@ export function buildExecutiveSummary(
     slaConsumed.push(timeline.slaConsumedPercent);
   }
 
+  // Dispatch time and appointment delay are historical/informational, so
+  // they look across every visible PO (Pending, Expired, Needs Review),
+  // not just the ones currently in the Pending scoring chain.
   for (const po of pos) {
     if (po.dispatchDate) {
       const dispatchTime = daysBetween(po.poRaisedDate, po.dispatchDate);
@@ -96,10 +100,10 @@ export function buildExecutiveSummary(
     }
   }
 
-  const expired = pos.filter((po) => po.status.trim().toLowerCase() === "expired").length;
+  const expired = pos.filter((po) => isExpiredStatus(po.status)).length;
 
   return {
-    totalActive: activePos.length,
+    totalActive: pendingPos.length,
     critical,
     high,
     medium,

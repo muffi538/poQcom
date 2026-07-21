@@ -27,27 +27,45 @@ export interface PurchaseOrder {
   raw: Record<string, unknown>; // untouched source row, for debugging/audit
 }
 
-// Statuses treated as terminal — excluded from "active PO" counts and
-// priority scoring. Confirmed against the sheet's real status vocabulary
-// (which uses words like "Delivered"/"RTO Done", not "Cancelled/Closed"):
-// anything that means the PO already reached an end state — fulfilled,
-// returned, cancelled, or expired — is terminal. Statuses that still need
-// ops attention (Pending, Scheduled, Price issue, Low Value Cant Dispatch,
-// Revised appt. required) stay active.
-const TERMINAL_STATUS_EXACT = new Set([
-  "delivered",
-  "cancel",
-  "cancelled",
-  "rto done",
-  "dispatched",
-  "expired",
-]);
+// Statuses that mean the PO already reached a real end state — fulfilled,
+// returned, or cancelled. Fully excluded everywhere (confirmed).
+const TERMINAL_STATUS_EXACT = new Set(["delivered", "cancel", "cancelled", "rto done"]);
 
 export function isTerminalStatus(status: string): boolean {
   const normalized = status.trim().toLowerCase();
   if (TERMINAL_STATUS_EXACT.has(normalized)) return true;
   // Catches courier-specific variants like "Dispatched Safexpress".
   return normalized.startsWith("dispatched");
+}
+
+// Confirmed: "Low Value Cant Dispatch" is fully excluded too, same as
+// terminal statuses — these POs are never going to be dispatched.
+export function isLowValueCantDispatch(status: string): boolean {
+  return status.trim().toLowerCase() === "low value cant dispatch";
+}
+
+export function isExpiredStatus(status: string): boolean {
+  return status.trim().toLowerCase() === "expired";
+}
+
+export function isPendingStatus(status: string): boolean {
+  return status.trim().toLowerCase() === "pending";
+}
+
+// Routes a PO to exactly one bucket, per the confirmed status handling:
+// only "Pending" runs through the priority scoring chain. "Expired" gets
+// its own section instead of being mixed into the ranked table. Terminal
+// and Low Value Cant Dispatch are hidden entirely. Anything else
+// (Price issue, Scheduled, Revised appt. required, ...) is real,
+// unclassified ground — surfaced as "Needs Review" rather than silently
+// scored or silently hidden, until confirmed.
+export type StatusBucket = "pending" | "expired" | "excluded" | "needs_review";
+
+export function classifyStatus(status: string): StatusBucket {
+  if (isTerminalStatus(status) || isLowValueCantDispatch(status)) return "excluded";
+  if (isExpiredStatus(status)) return "expired";
+  if (isPendingStatus(status)) return "pending";
+  return "needs_review";
 }
 
 // Derived, not stored — computed by the SLA calculator from poRaisedDate /

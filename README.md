@@ -59,9 +59,15 @@ not a demo.
 - **Executive Summary** (`src/lib/dashboard/summary.ts`) — real KPIs:
   Total Active PO, Critical/High/Medium/Low/Unscored, Expired, Expiring
   Today, Pending Qty/Value, Avg Dispatch Time, Avg Appointment Delay, Avg
-  SLA Consumption. "Active" excludes terminal statuses (Delivered,
-  Cancel/Cancelled, RTO Done, Dispatched*, Expired — confirmed against the
-  sheet's real status vocabulary).
+  SLA Consumption.
+- **Status routing** (`classifyStatus` in `src/types/purchase-order.ts`,
+  confirmed) — only Status = "Pending" runs through the priority scoring
+  chain and appears in the ranked Control Tower table. "Expired" and
+  "Needs Review" (any other non-terminal status — Price issue, Scheduled,
+  Revised appt. required) get their own read-only sections instead of
+  being scored alongside Pending. Delivered/Cancel/Cancelled/RTO
+  Done/Dispatched*/"Low Value Cant Dispatch" are excluded everywhere.
+  "Needs Review" is real unclassified ground, not a guess — see below.
 
 ## Where the Google Sheet link goes
 
@@ -102,6 +108,12 @@ paste there today.
   actually tracks partial dispatch.
 - **City aliases** — "Bangalore" (Zepto) vs "Bengaluru" (Blinkit) currently
   stay separate; say the word if they should merge.
+- **"Needs Review" statuses** — currently Scheduled, Price issue, and
+  Revised appt. required all sit outside the priority chain (50 POs on
+  the live sheet, mostly Scheduled). Scheduled in particular has real
+  urgency (SLA% well past 100% on several) — worth confirming whether it
+  should be treated like Pending for scoring, kept separate, or something
+  else entirely.
 
 ## Running it
 
