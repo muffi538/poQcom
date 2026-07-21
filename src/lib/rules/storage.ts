@@ -1,6 +1,7 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { Rule, RuleGroup, RuleHistoryEntry } from "@/types/rules";
+import { SEED_RULES } from "./seed-rules";
 
 // Placeholder persistence: a JSON file on disk. This is here so the Rules
 // Builder UI has somewhere to read/write during development. It should be
@@ -26,8 +27,12 @@ async function writeJson(file: string, data: unknown): Promise<void> {
   await fs.writeFile(file, JSON.stringify(data, null, 2), "utf-8");
 }
 
+// Falls back to the confirmed starter rules (src/lib/rules/seed-rules.ts)
+// until ops saves their own rules.json through the (forthcoming)
+// interactive Rules Builder — at that point this file becomes the real
+// source of truth and the seed no longer applies.
 export async function listRules(): Promise<Rule[]> {
-  return readJson<Rule[]>(RULES_FILE, []);
+  return readJson<Rule[]>(RULES_FILE, SEED_RULES);
 }
 
 export async function saveRules(rules: Rule[]): Promise<void> {
