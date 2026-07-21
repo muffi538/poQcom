@@ -1,0 +1,31 @@
+{
+  "name": "poqcom",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI Operations Control Tower - Purchase Order priority dashboard framework",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "16.2.10",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "googleapis": "173.0.0",
+    "zod": "3.23.8"
+  },
+  "devDependencies": {
+    "typescript": "5.7.3",
+    "@types/node": "20.14.15",
+    "@types/react": "19.0.8",
+    "@types/react-dom": "19.0.3",
+    "autoprefixer": "10.4.19",
+    "postcss": "8.4.40",
+    "tailwindcss": "3.4.7",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.2.10"
+  }
+}
