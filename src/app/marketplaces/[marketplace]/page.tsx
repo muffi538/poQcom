@@ -66,41 +66,48 @@ export default async function MarketplacePage({
 
   return (
     <MarketplaceThemeScope marketplace={marketplace}>
-      <div className="space-y-6">
-        <div className="flex items-center gap-3">
-          <span className="h-3 w-3 rounded-full" style={{ backgroundColor: theme.primary }} />
-          <h1 className="text-2xl font-semibold tracking-tight">{marketplace}</h1>
-        </div>
+      <div className="space-y-2">
+        <h1 className="flex items-center gap-2 text-base font-semibold tracking-tight text-neutral-500">
+          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: theme.primary }} />
+          {marketplace}
+        </h1>
 
         {errorMessage ? (
           <AwaitingConfig title={`${marketplace} PO table`} items={[errorMessage]} />
         ) : summary ? (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
+          <div className="flex flex-wrap gap-1">
             <KpiCard label="Pending Orders" value={summary.totalActive} icon={Package} tone="accent" />
-            <KpiCard label="Expired Pending POs" value={summary.expiredPending} icon={AlertTriangle} tone="critical" />
+            <KpiCard label="Expired Pending" value={summary.expiredPending} icon={AlertTriangle} tone="critical" />
             <KpiCard label="Pending Qty" value={summary.pendingQty} icon={Boxes} tone="accent" />
-            <KpiCard label="Avg Dispatch Time" value={fmtDays(summary.avgDispatchTimeDays)} icon={Truck} tone="accent" />
-            <KpiCard label="Avg Appointment Delay" value={fmtDays(summary.avgAppointmentDelayDays)} icon={Clock} tone="accent" />
+            <KpiCard label="Avg Dispatch" value={fmtDays(summary.avgDispatchTimeDays)} icon={Truck} tone="accent" />
+            <KpiCard label="Avg Appt Delay" value={fmtDays(summary.avgAppointmentDelayDays)} icon={Clock} tone="accent" />
             <KpiCard
-              label="Avg Days Late (overdue)"
+              label="Avg Days Late"
               value={summary.avgOperationalDelayDaysLate === null ? "—" : `${summary.avgOperationalDelayDaysLate.toFixed(1)}d`}
               icon={AlertTriangle}
               tone="critical"
             />
-            <KpiCard label="Risk (Critical + High)" value={summary.critical + summary.high} icon={ShieldAlert} tone="critical" />
+            <KpiCard label="Risk (Crit+High)" value={summary.critical + summary.high} icon={ShieldAlert} tone="critical" />
           </div>
         ) : null}
 
         {!errorMessage && (
           <>
             <PoControlTower rows={pendingRows} marketplaces={[marketplace]} hasRules={hasRules} />
-            <SecondaryPoTable title="Expired POs" rows={expiredRows} />
-            <SecondaryPoTable
-              title="Needs Review — status not yet classified"
-              note="Price issue, Scheduled, Revised appt. required, etc. — not run through priority scoring until confirmed how they should be handled."
-              rows={needsReviewRows}
-            />
-            <PoCharts rows={pendingRows} accentHex={theme.primary} />
+            <details className="glass-card rounded-lg px-3 py-1.5 text-xs">
+              <summary className="cursor-pointer select-none font-medium text-neutral-500">
+                Expired POs, Needs Review, and Charts
+              </summary>
+              <div className="mt-2 space-y-3 pb-1">
+                <SecondaryPoTable title="Expired POs" rows={expiredRows} />
+                <SecondaryPoTable
+                  title="Needs Review — status not yet classified"
+                  note="Price issue, Scheduled, Revised appt. required, etc. — not run through priority scoring until confirmed how they should be handled."
+                  rows={needsReviewRows}
+                />
+                <PoCharts rows={pendingRows} accentHex={theme.primary} />
+              </div>
+            </details>
           </>
         )}
       </div>

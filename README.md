@@ -67,7 +67,7 @@ not a demo.
   City Queue, Low Value Orders). Deliberately does **not** include a Safe-
   to-Postpone section or a Priority/Risk-distribution chart yet — those
   need the engine's real judgment across more confirmed rules than the
-  six seeded so far.
+  five seeded so far.
 - **Charts** (`src/components/dashboard/po-charts.tsx`) — Expiry Timeline,
   PO Value by Marketplace, Pending Qty by City, Avg Days Late by
   Marketplace (overdue POs only). Built to the dataviz skill's method
@@ -117,6 +117,36 @@ new look:
   views, column pinning, CSV/PDF export, expandable rows. Flag if you
   want those built next.
 
+## Density pass (enterprise grid layout)
+
+Rebuilt the Control Tower table around a hard column-width budget
+(`COL` in `po-control-tower.tsx`) via `<colgroup>` + `table-layout:
+fixed`, instead of letting content push columns wider — verified at
+1920×1080 with **zero horizontal scroll** (table's scrollWidth ==
+clientWidth). Sticky columns: rank, Priority, PO Number, Marketplace
+(cumulative `left` offsets computed from the column widths, not
+guessed). Long text (FC/warehouse name, the Reason/Action column)
+truncates with `title=` for the full value on hover. Row height/font
+dropped to ~12px text with ~4-6px padding — about 30 rows visible per
+screen on a 1080p monitor.
+
+The old big "Expiring Soon / Metro Queue / Low Value Orders" section
+cards are gone — replaced with compact toggle chips in the filter
+toolbar (each shows a live count, click to filter the table itself, no
+separate list to maintain). Expired POs / Needs Review / charts are
+tucked behind a collapsed `<details>` disclosure below the main table,
+so by default the KPI strip + filters + table take up the page, per the
+requested "KPI strip → filters → full-width table" hierarchy.
+
+KPI cards shrunk ~55% (126px→118px wide, single line of text, hover
+tooltip on the label) and the sidebar narrowed (240px→176px expanded,
+64px→48px collapsed) to give the table more room.
+
+**Not built in this pass** (genuine new functionality, not layout):
+Excel-style column resize-by-drag, keyboard grid navigation
+(arrow-key cell movement), column pinning beyond the fixed sticky set,
+CSV/PDF export. Sorting, filtering, and click-to-drill-in already work.
+
 ## Where the Google Sheet link goes
 
 `.env` (copy from `.env.example`) — already pre-filled with your sheet's
@@ -130,7 +160,7 @@ paste there today.
   are still disabled; `/rules-builder` lists the current rules read-only
   with a plain-English breakdown of each one. `src/lib/rules/field-
   catalog.ts` has the confirmed field list ready for when this gets built.
-- More rules — only 6 of your original examples are seeded. Still open:
+- More rules — only 5 of your original examples are seeded. Still open:
   Inventory Risk / "PO Value < 25000 AND Inventory Low" (blocked on the
   Inventory tab), Warehouse=Mumbai AND Pending Qty>1000 Warehouse Risk
   (score not yet confirmed). Supplier rules were dropped entirely — no

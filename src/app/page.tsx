@@ -78,20 +78,17 @@ export default async function OverviewPage() {
 
   return (
     <MarketplaceThemeScope marketplace={null}>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Overview</h1>
-          <p className="text-sm text-neutral-500">
-            Executive summary across Zepto, Blinkit, and Instamart.
-          </p>
-        </div>
+      <div className="space-y-2">
+        <h1 className="text-base font-semibold tracking-tight text-neutral-500">
+          Overview <span className="font-normal text-neutral-400">— Zepto, Blinkit, Instamart</span>
+        </h1>
 
         {errorMessage ? (
           <AwaitingConfig title="Executive Summary" items={[errorMessage]} />
         ) : summary ? (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            <KpiCard label="Total Active PO (Pending)" value={fmtNumber(summary.totalActive)} icon={Package} tone="accent" />
-            <KpiCard label="Expired Pending POs" value={fmtNumber(summary.expiredPending)} icon={AlertTriangle} tone="critical" />
+          <div className="flex flex-wrap gap-1">
+            <KpiCard label="Active PO" value={fmtNumber(summary.totalActive)} icon={Package} tone="accent" />
+            <KpiCard label="Expired Pending" value={fmtNumber(summary.expiredPending)} icon={AlertTriangle} tone="critical" />
             <KpiCard label="Critical" value={fmtNumber(summary.critical)} icon={AlertOctagon} tone="critical" />
             <KpiCard label="High" value={fmtNumber(summary.high)} icon={Flame} tone="high" />
             <KpiCard label="Medium" value={fmtNumber(summary.medium)} icon={Gauge} tone="medium" />
@@ -99,13 +96,13 @@ export default async function OverviewPage() {
             <KpiCard label="Unscored" value={fmtNumber(summary.unscored)} icon={CircleSlash} />
             <KpiCard label="Expired (Status)" value={fmtNumber(summary.expired)} icon={CalendarX2} tone="critical" />
             <KpiCard label="Expiring Today" value={fmtNumber(summary.expiringToday)} icon={CalendarClock} tone="high" />
-            <KpiCard label="Expiring Tomorrow" value={fmtNumber(summary.expiringTomorrow)} icon={CalendarDays} tone="medium" />
+            <KpiCard label="Expiring Tmrw" value={fmtNumber(summary.expiringTomorrow)} icon={CalendarDays} tone="medium" />
             <KpiCard label="Pending Qty" value={fmtNumber(summary.pendingQty)} icon={Boxes} />
             <KpiCard label="Pending Value" value={fmtCurrency(summary.pendingValue)} icon={Wallet} />
-            <KpiCard label="Avg Dispatch Time" value={fmtDays(summary.avgDispatchTimeDays)} icon={Truck} />
-            <KpiCard label="Avg Appointment Delay" value={fmtDays(summary.avgAppointmentDelayDays)} icon={Clock} />
+            <KpiCard label="Avg Dispatch" value={fmtDays(summary.avgDispatchTimeDays)} icon={Truck} />
+            <KpiCard label="Avg Appt Delay" value={fmtDays(summary.avgAppointmentDelayDays)} icon={Clock} />
             <KpiCard
-              label="Avg Days Late (overdue)"
+              label="Avg Days Late"
               value={summary.avgOperationalDelayDaysLate === null ? "—" : `${summary.avgOperationalDelayDaysLate.toFixed(1)}d`}
               icon={Hourglass}
               tone="critical"
@@ -116,13 +113,20 @@ export default async function OverviewPage() {
         {!errorMessage && (
           <>
             <PoControlTower rows={pendingRows} marketplaces={[...MARKETPLACES]} hasRules={hasRules} />
-            <SecondaryPoTable title="Expired POs" rows={expiredRows} />
-            <SecondaryPoTable
-              title="Needs Review — status not yet classified"
-              note="Price issue, Scheduled, Revised appt. required, etc. — not run through priority scoring until confirmed how they should be handled."
-              rows={needsReviewRows}
-            />
-            <PoCharts rows={pendingRows} />
+            <details className="glass-card rounded-lg px-3 py-1.5 text-xs">
+              <summary className="cursor-pointer select-none font-medium text-neutral-500">
+                Expired POs, Needs Review, and Charts
+              </summary>
+              <div className="mt-2 space-y-3 pb-1">
+                <SecondaryPoTable title="Expired POs" rows={expiredRows} />
+                <SecondaryPoTable
+                  title="Needs Review — status not yet classified"
+                  note="Price issue, Scheduled, Revised appt. required, etc. — not run through priority scoring until confirmed how they should be handled."
+                  rows={needsReviewRows}
+                />
+                <PoCharts rows={pendingRows} />
+              </div>
+            </details>
           </>
         )}
       </div>

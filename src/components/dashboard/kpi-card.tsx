@@ -22,16 +22,18 @@ export function KpiCard({
 }) {
   const style = TONE_STYLE[tone] ?? TONE_STYLE.default;
   return (
-    <div className="glass-card card-elevate rounded-card p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-2">
-        <div className="text-xs font-medium uppercase tracking-wide text-neutral-500">{label}</div>
+    <div className="glass-card w-[118px] shrink-0 rounded-lg px-2 py-1.5 shadow-sm">
+      <div className="flex items-center justify-between gap-1">
+        <div className="truncate text-[10px] font-medium text-neutral-500" title={label}>
+          {label}
+        </div>
         {Icon && (
-          <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${style.bg} ${style.fg}`}>
-            <Icon size={16} strokeWidth={2.25} />
+          <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded ${style.bg} ${style.fg}`}>
+            <Icon size={12} strokeWidth={2.25} />
           </span>
         )}
       </div>
-      <div className="mt-2 text-2xl font-semibold tabular-nums">{value}</div>
+      <div className="mt-0.5 text-lg font-semibold leading-tight tabular-nums">{value}</div>
     </div>
   );
 }

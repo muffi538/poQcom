@@ -26,8 +26,19 @@ const LEVEL_STYLE: Record<string, { dot: string; classes: string; label: string 
   },
 };
 
-export function PriorityBadge({ level }: { level: string }) {
+export function PriorityBadge({ level, compact }: { level: string; compact?: boolean }) {
   const style = LEVEL_STYLE[level] ?? LEVEL_STYLE.Unscored;
+  if (compact) {
+    return (
+      <span
+        className={`inline-flex max-w-full items-center gap-1 truncate rounded px-1.5 py-0.5 text-[10px] font-semibold leading-none ${style.classes}`}
+        title={style.label}
+      >
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: style.dot }} />
+        <span className="truncate">{style.label}</span>
+      </span>
+    );
+  }
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${style.classes}`}>
       <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: style.dot }} />

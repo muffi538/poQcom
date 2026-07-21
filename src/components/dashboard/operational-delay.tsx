@@ -9,6 +9,13 @@ export function formatOperationalDelay(days: number | null): string {
   return `${-days} Day${-days === 1 ? "" : "s"} Remaining`;
 }
 
+export function formatOperationalDelayCompact(days: number | null): string {
+  if (days === null) return "—";
+  if (days > 0) return `${days}d late`;
+  if (days === 0) return "due today";
+  return `${-days}d left`;
+}
+
 export function operationalDelayColor(days: number | null): string {
   if (days === null) return "#898781";
   if (days > 0) return "#d03b3b";
@@ -16,8 +23,16 @@ export function operationalDelayColor(days: number | null): string {
   return "#0ca30c";
 }
 
-export function OperationalDelayBadge({ days }: { days: number | null }) {
+export function OperationalDelayBadge({ days, compact }: { days: number | null; compact?: boolean }) {
   const color = operationalDelayColor(days);
+  if (compact) {
+    return (
+      <span className="inline-flex items-center gap-1 whitespace-nowrap text-[11px] font-semibold" style={{ color }} title={formatOperationalDelay(days)}>
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+        {formatOperationalDelayCompact(days)}
+      </span>
+    );
+  }
   return (
     <span className="inline-flex items-center gap-1.5 text-xs font-semibold" style={{ color }}>
       <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
