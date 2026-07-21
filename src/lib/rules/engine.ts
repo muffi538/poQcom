@@ -4,13 +4,25 @@ import {
   Rule,
   isConditionGroup,
 } from "@/types/rules";
-import { PoPriorityResult } from "@/types/purchase-order";
 
 // Generic evaluation context: whatever fields a PO exposes, keyed by the
 // same `field` strings used in Condition.field. Deliberately untyped beyond
 // this so it works for both raw sheet columns and derived fields (SLA %,
 // appointment delay, etc.) without the engine caring which is which.
 export type EvalContext = Record<string, unknown>;
+
+// Everything the mechanical rule engine can produce for one PO. Priority
+// Level is deliberately not part of this — it's derived afterward, purely
+// from `score` via the configurable thresholds (see levelForScore in
+// src/lib/config/store.ts), never set directly by a rule.
+export interface RuleRunResult {
+  score: number;
+  appliedRuleIds: string[];
+  skippedRuleIds: string[];
+  flags: string[];
+  confidence: number;
+  explanation: string[];
+}
 
 function toNumber(v: unknown): number | null {
   const n = typeof v === "number" ? v : Number(v);
@@ -68,15 +80,17 @@ export function evaluateGroup(group: ConditionGroup, ctx: EvalContext): boolean 
 }
 
 // Runs an ordered, enabled rule set against one PO's evaluation context.
-// Pure mechanics only: no rule's score, threshold, or flag is assumed here
-// — every number in the output comes from the Rule objects passed in.
-export function runRules(rules: Rule[], poId: string, ctx: EvalContext): PoPriorityResult {
+// Pure mechanics only: no rule's score or flag is assumed here — every
+// number in the output comes from the Rule objects passed in. Scores
+// accumulate across matching rules by default; a rule can set
+// scoreMode: "override" to reset the running score, and onMatch: "stop"
+// to short-circuit lower-priority rules (both confirmed behaviors).
+export function runRules(rules: Rule[], ctx: EvalContext): RuleRunResult {
   const ordered = [...rules]
     .filter((r) => r.enabled)
     .sort((a, b) => a.order - b.order);
 
   let score = 0;
-  let level: PoPriorityResult["level"] | null = null;
   const flags = new Set<string>();
   const applied: string[] = [];
   const skipped: string[] = [];
@@ -97,23 +111,16 @@ export function runRules(rules: Rule[], poId: string, ctx: EvalContext): PoPrior
       score =
         rule.action.scoreMode === "override" ? rule.action.scoreDelta : score + rule.action.scoreDelta;
     }
-    if (rule.action.setPriorityLevel) {
-      level = rule.action.setPriorityLevel;
-    }
 
     if (rule.onMatch === "stop") break;
   }
 
   return {
-    poId,
     score,
-    // No fallback level is invented when nothing matches — what a PO with
-    // zero applied rules should show is one of the open questions below.
-    level: level ?? "Unscored",
     appliedRuleIds: applied,
     skippedRuleIds: skipped,
     flags: Array.from(flags),
-    confidence: applied.length > 0 ? Math.min(1, applied.length / ordered.length || 1) : 0,
+    confidence: ordered.length > 0 ? applied.length / ordered.length : 0,
     explanation,
   };
 }

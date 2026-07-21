@@ -55,10 +55,12 @@ export function isConditionGroup(
 
 export type ScoreMode = "accumulate" | "override";
 
+// Priority Level is confirmed to be derived purely from the final
+// accumulated score via configurable thresholds (see EngineConfig.
+// levelThresholds) — a rule's action can never force a level directly.
 export interface RuleAction {
   scoreMode: ScoreMode;
-  scoreDelta: number | null; // null when this rule only sets level/flags, no score
-  setPriorityLevel: "Critical" | "High" | "Medium" | "Low" | null;
+  scoreDelta: number | null; // null when this rule only adds flags, no score
   addFlags: string[];
   reason: string; // human-readable explanation shown in Explanation / Simulator
 }
