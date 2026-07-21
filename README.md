@@ -42,7 +42,7 @@ not a demo.
   final score via configurable thresholds (Critical ≥80, High ≥60, Medium
   ≥30, Low below — confirmed starting defaults). A PO with zero matching
   rules shows "Unscored", not a guessed default (confirmed).
-- **Starter rules** (`src/lib/rules/seed-rules.ts`) — six rules, each
+- **Starter rules** (`src/lib/rules/seed-rules.ts`) — five rules, each
   confirmed with real score deltas. Evaluated first: **Expired Pending PO**
   (+100) — a PO past its own expiry date and still not Delivered, alone
   enough to cross the Critical threshold, per the confirmed "should
