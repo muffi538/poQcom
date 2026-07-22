@@ -99,8 +99,11 @@ export function buildExecutiveSummary(
   }
 
   // Dispatch time and appointment delay are historical/informational, so
-  // they look across every visible PO (Pending, Expired, Needs Review),
-  // not just the ones currently in the Pending scoring chain.
+  // they look across every visible PO (Pending, Expired, Dispatched,
+  // Delivered, Needs Review) — Dispatched/Delivered are the ones that
+  // actually carry a real Dispatch Date, so including them here (instead
+  // of excluding them from the dashboard entirely) is what gives this
+  // average real data to work with.
   for (const po of pos) {
     if (po.dispatchDate) {
       const dispatchTime = daysBetween(po.poRaisedDate, po.dispatchDate);

@@ -15,7 +15,7 @@ import { getDemandIndex } from "@/lib/demand";
 import { buildTopSkuTable, TopSkuTableResult } from "@/lib/demand/sku-table";
 import { buildExecutiveSummary } from "@/lib/dashboard/summary";
 import { buildPoRows } from "@/lib/dashboard/po-rows";
-import { classifyStatus, isTerminalStatus, isLowValueCantDispatch } from "@/types/purchase-order";
+import { classifyStatus, isFullyExcludedStatus, isLowValueCantDispatch } from "@/types/purchase-order";
 import { themeFor } from "@/lib/theme/marketplace-colors";
 
 export function generateStaticParams() {
@@ -41,6 +41,8 @@ export default async function MarketplacePage({
   let summary: Awaited<ReturnType<typeof buildExecutiveSummary>> | null = null;
   let pendingRows: ReturnType<typeof buildPoRows> = [];
   let expiredRows: ReturnType<typeof buildPoRows> = [];
+  let dispatchedRows: ReturnType<typeof buildPoRows> = [];
+  let deliveredRows: ReturnType<typeof buildPoRows> = [];
   let needsReviewRows: ReturnType<typeof buildPoRows> = [];
   let hasRules = false;
   let demandError: string | null = null;
@@ -57,14 +59,18 @@ export default async function MarketplacePage({
     const demandIndex = demand.index;
     demandError = demand.error;
 
-    const visiblePos = pos.filter((po) => !isTerminalStatus(po.status) && !isLowValueCantDispatch(po.status));
+    const visiblePos = pos.filter((po) => !isFullyExcludedStatus(po.status) && !isLowValueCantDispatch(po.status));
     const pendingPos = visiblePos.filter((po) => classifyStatus(po.status) === "pending");
     const expiredPos = visiblePos.filter((po) => classifyStatus(po.status) === "expired");
+    const dispatchedPos = visiblePos.filter((po) => classifyStatus(po.status) === "dispatched");
+    const deliveredPos = visiblePos.filter((po) => classifyStatus(po.status) === "delivered");
     const needsReviewPos = visiblePos.filter((po) => classifyStatus(po.status) === "needs_review");
 
     summary = buildExecutiveSummary(visiblePos, rules, config, demandIndex);
     pendingRows = buildPoRows(pendingPos, rules, config, demandIndex);
     expiredRows = buildPoRows(expiredPos, rules, config, demandIndex);
+    dispatchedRows = buildPoRows(dispatchedPos, rules, config, demandIndex);
+    deliveredRows = buildPoRows(deliveredPos, rules, config, demandIndex);
     needsReviewRows = buildPoRows(needsReviewPos, rules, config, demandIndex);
     topSkuData = buildTopSkuTable(marketplace as SupportedMarketplace, demandIndex, pendingPos);
   } catch (err) {
@@ -111,10 +117,20 @@ export default async function MarketplacePage({
             {topSkuData && <DemandIntelligence marketplace={marketplace} data={topSkuData} />}
             <details className="glass-card rounded-lg px-3 py-1.5 text-xs">
               <summary className="cursor-pointer select-none font-medium text-neutral-500">
-                Expired POs, Needs Review, and Charts
+                Expired, Dispatched, Delivered, Needs Review, and Charts
               </summary>
               <div className="mt-2 space-y-3 pb-1">
                 <SecondaryPoTable title="Expired POs" rows={expiredRows} />
+                <SecondaryPoTable
+                  title="Dispatched POs"
+                  note="Already shipped — read-only, kept for dispatch-performance history."
+                  rows={dispatchedRows}
+                />
+                <SecondaryPoTable
+                  title="Delivered POs"
+                  note="Fulfilled — read-only, kept for analytics/trends."
+                  rows={deliveredRows}
+                />
                 <SecondaryPoTable
                   title="Needs Review — status not yet classified"
                   note="Price issue, Scheduled, Revised appt. required, etc. — not run through priority scoring until confirmed how they should be handled."

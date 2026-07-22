@@ -41,7 +41,13 @@ export interface PurchaseOrder {
 }
 
 // Statuses that mean the PO already reached a real end state — fulfilled,
-// returned, or cancelled. Fully excluded everywhere (confirmed).
+// returned, or cancelled. "Terminal" here means "no longer relevant for
+// Operational Delay tracking" (see computeTimeline) — it does NOT by
+// itself mean "hidden from the dashboard"; Delivered/Dispatched get their
+// own visible, read-only sections (confirmed: historical POs stay
+// available for analytics/dispatch-performance, not silently thrown
+// away) via isDeliveredStatus/isDispatchedStatus below. isFullyExcluded-
+// Status is the narrower set that's genuinely hidden everywhere.
 const TERMINAL_STATUS_EXACT = new Set(["delivered", "cancel", "cancelled", "rto done"]);
 
 export function isTerminalStatus(status: string): boolean {
@@ -51,8 +57,26 @@ export function isTerminalStatus(status: string): boolean {
   return normalized.startsWith("dispatched");
 }
 
+export function isDeliveredStatus(status: string): boolean {
+  return status.trim().toLowerCase() === "delivered";
+}
+
+// Catches courier-specific variants like "Dispatched Safexpress".
+export function isDispatchedStatus(status: string): boolean {
+  return status.trim().toLowerCase().startsWith("dispatched");
+}
+
+// Confirmed: Cancel/Cancelled/RTO Done are fully excluded everywhere —
+// unlike Delivered/Dispatched, there's no operational or analytics value
+// in surfacing them (nothing to dispatch, nothing to learn about timing).
+const FULLY_EXCLUDED_STATUS_EXACT = new Set(["cancel", "cancelled", "rto done"]);
+
+export function isFullyExcludedStatus(status: string): boolean {
+  return FULLY_EXCLUDED_STATUS_EXACT.has(status.trim().toLowerCase());
+}
+
 // Confirmed: "Low Value Cant Dispatch" is fully excluded too, same as
-// terminal statuses — these POs are never going to be dispatched.
+// Cancel/Cancelled/RTO Done — these POs are never going to be dispatched.
 export function isLowValueCantDispatch(status: string): boolean {
   return status.trim().toLowerCase() === "low value cant dispatch";
 }
@@ -66,16 +90,19 @@ export function isPendingStatus(status: string): boolean {
 }
 
 // Routes a PO to exactly one bucket, per the confirmed status handling:
-// only "Pending" runs through the priority scoring chain. "Expired" gets
-// its own section instead of being mixed into the ranked table. Terminal
-// and Low Value Cant Dispatch are hidden entirely. Anything else
+// only "Pending" runs through the priority scoring chain. "Expired",
+// "Dispatched", and "Delivered" each get their own read-only section
+// instead of being mixed into the ranked table. Cancel/Cancelled/RTO
+// Done/Low Value Cant Dispatch are hidden entirely. Anything else
 // (Price issue, Scheduled, Revised appt. required, ...) is real,
 // unclassified ground — surfaced as "Needs Review" rather than silently
 // scored or silently hidden, until confirmed.
-export type StatusBucket = "pending" | "expired" | "excluded" | "needs_review";
+export type StatusBucket = "pending" | "expired" | "dispatched" | "delivered" | "excluded" | "needs_review";
 
 export function classifyStatus(status: string): StatusBucket {
-  if (isTerminalStatus(status) || isLowValueCantDispatch(status)) return "excluded";
+  if (isFullyExcludedStatus(status) || isLowValueCantDispatch(status)) return "excluded";
+  if (isDeliveredStatus(status)) return "delivered";
+  if (isDispatchedStatus(status)) return "dispatched";
   if (isExpiredStatus(status)) return "expired";
   if (isPendingStatus(status)) return "pending";
   return "needs_review";

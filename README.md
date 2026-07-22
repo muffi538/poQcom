@@ -80,12 +80,18 @@ not a demo.
   (among currently-overdue POs).
 - **Status routing** (`classifyStatus` in `src/types/purchase-order.ts`,
   confirmed) — only Status = "Pending" runs through the priority scoring
-  chain and appears in the ranked Control Tower table. "Expired" and
-  "Needs Review" (any other non-terminal status — Price issue, Scheduled,
-  Revised appt. required) get their own read-only sections instead of
-  being scored alongside Pending. Delivered/Cancel/Cancelled/RTO
-  Done/Dispatched*/"Low Value Cant Dispatch" are excluded everywhere.
-  "Needs Review" is real unclassified ground, not a guess — see below.
+  chain and appears in the ranked Control Tower table. "Expired",
+  "Dispatched", "Delivered", and "Needs Review" (any other status —
+  Price issue, Scheduled, Revised appt. required) each get their own
+  read-only section instead of being scored alongside Pending or hidden
+  outright — historical POs stay visible for dispatch-performance/
+  analytics rather than silently disappearing. Only Cancel/Cancelled/RTO
+  Done/"Low Value Cant Dispatch" are excluded everywhere
+  (`isFullyExcludedStatus`, deliberately narrower than the older
+  `isTerminalStatus` — the latter is still used, unchanged, by
+  `computeTimeline`/Operational Delay math, where Delivered also counts
+  as "done"). "Needs Review" is real unclassified ground, not a guess —
+  see below.
 
 ## Demand Intelligence Engine
 
@@ -200,8 +206,8 @@ new look:
   — charcoal, not pure black.
 - Deliberately not built in this pass (real functionality, not just
   styling, so out of scope for "don't change functionality"): saved
-  views, column pinning, CSV/PDF export, expandable rows. Flag if you
-  want those built next.
+  views, column pinning, expandable rows. CSV export was added later
+  (see below). Flag if you want the rest built next.
 
 ## Density pass (enterprise grid layout)
 
@@ -230,8 +236,41 @@ tooltip on the label) and the sidebar narrowed (240px→176px expanded,
 
 **Not built in this pass** (genuine new functionality, not layout):
 Excel-style column resize-by-drag, keyboard grid navigation
-(arrow-key cell movement), column pinning beyond the fixed sticky set,
-CSV/PDF export. Sorting, filtering, and click-to-drill-in already work.
+(arrow-key cell movement), column pinning beyond the fixed sticky set.
+Sorting, filtering, and click-to-drill-in already work. (CSV export was
+added in a later pass — see "Excel/CSV export" below.)
+
+## Excel/CSV export
+
+Every dashboard table (Control Tower ranked table, Expired/Dispatched/
+Delivered/Needs Review secondary tables, Top Performing SKUs) has an
+Export button (`src/components/dashboard/export-button.tsx`,
+`src/lib/export/csv.ts`) that downloads the currently-filtered rows as a
+`.csv` file — no new dependency; hand-rolled CSV generation (proper
+quote/comma/newline escaping) with a UTF-8 BOM prefix so Excel renders
+`₹` and other non-ASCII characters correctly instead of mangling them.
+Disabled when there are zero rows to export. Exported values are raw
+(numbers, ISO dates) rather than the display-formatted strings shown in
+the table, so the file is usable for further spreadsheet work, not just
+a visual copy.
+
+## Row height / density pass (fixed-height rows)
+
+The ranked table's rows were briefly inconsistent height (a row with a
+long Reason/Action wrapped and grew taller than its neighbors, with
+large visual gaps between rows as a result). Fixed by going back to a
+hard fixed row height (`ROW_HEIGHT = "h-[56px]"` in
+`po-control-tower.tsx`) with `flex h-full items-center` wrappers for
+vertically centering badge cells, and switching long text back to
+single-line `truncate` + `title=` tooltip instead of wrapping. The
+Reason/Action column now shows only the single highest-priority reason
+plus a "+N more" badge when there are others, instead of joining every
+triggered rule into one long wrapped string — hover/the row's `title`
+reveals the rest. This same row height and truncation convention is
+shared by every marketplace's table and the secondary tables, so
+Zepto/Blinkit/Instamart/Flipkart Minutes all look identical. The gap
+between the KPI strip and the table was also tightened
+(`space-y-2` → `space-y-1.5`) so it reads as one connected dashboard.
 
 ## Where the Google Sheet link goes
 
@@ -319,22 +358,44 @@ also logs a one-line summary on every fetch (any marketplace, not just
 this one): total POs parsed, product rows parsed, and Pending/Delivered/
 Cancelled counts — a standing sanity check, not a one-off.
 
-**Bug found and fixed while wiring this up** (pre-existing, not specific
-to Flipkart Minutes): `forwardFillPoLevelColumns` used to decide
-"is this cell blank, so reuse the last value" independently *per column*.
-That's wrong for any column that can be legitimately blank on a real,
-new PO (e.g. no Scheduled Date yet) — a brand-new PO's row would
-silently inherit an unrelated *previous* PO's value for that column
-instead of staying blank. A synthetic test (a mocked sheet fed through
-the real `fetchPurchaseOrders` pipeline, since there's no test framework
-in this project yet) caught it: a Cancelled PO with no Scheduled Date
-came back with the *previous* PO's Scheduled Date instead of null. Fixed
-by deciding "is this row a continuation" once, off `PO Number` alone,
-instead of column-by-column. Re-verified against the real Zepto sheet
-afterward — identical scores/ranks to before the fix, as expected (this
-bug shape needs a genuinely-blank PO-level field on a brand-new PO's row
-to trigger, which Zepto/Blinkit/Instamart's real data apparently never
-hits, but Flipkart Minutes' Scheduled Date does).
+**Two bugs found and fixed while wiring this up**, both in how
+multi-line POs get their shared PO-level fields (Status, dates, City,
+Location):
+
+1. (pre-existing, not specific to Flipkart Minutes) The original
+   `forwardFillPoLevelColumns` decided "is this cell blank, so reuse the
+   last value" independently *per column*. That's wrong for any column
+   that can be legitimately blank on a real, new PO (e.g. no Scheduled
+   Date yet) — a brand-new PO's row would silently inherit an unrelated
+   *previous* PO's value for that column instead of staying blank. A
+   synthetic test (a mocked sheet fed through the real
+   `fetchPurchaseOrders` pipeline, since there's no test framework in
+   this project yet) caught it: a Cancelled PO with no Scheduled Date
+   came back with the *previous* PO's Scheduled Date instead of null.
+   First fix: decide "is this row a continuation" once, off `PO Number`
+   alone, instead of column-by-column.
+2. That first fix still assumed the row carrying a merged cell's real
+   value is always the group's *first* row, forward-filling it onto the
+   rows that follow. True for Zepto/Blinkit/Instamart's real sheets, but
+   not guaranteed in general — a second synthetic test modeled Flipkart
+   Minutes' actual shape (PO Number repeated on every row of a block,
+   but Status/dates only genuinely populated on one row in the *middle*
+   of it) and confirmed forward-fill alone can never backfill the rows
+   *before* that anchor row. Real fix: `forwardFillPoNumber` (renamed
+   from `forwardFillPoLevelColumns`) now forward-fills only the PO
+   Number grouping key; `aggregateLineItems` resolves every other
+   PO-level field (`firstNonBlank` helper in
+   `src/lib/sheets/marketplaces.ts`) by scanning the *whole* line-item
+   group for the first non-blank value, which is correct regardless of
+   which row happens to carry the real data.
+
+Re-verified against the real Zepto/Blinkit/Instamart sheets after both
+fixes — identical scores/ranks/parsed counts to before, as expected
+(these sheets' real data always anchors PO-level fields on the group's
+first row, so `firstNonBlank` picks the same value `group[0]` always
+did). Also re-confirmed against a synthetic mid-block-anchor scenario:
+Status/City/Location/dates all resolve correctly no matter where in the
+block the real values sit.
 
 Still open: confirming Flipkart Minutes' own brand color (currently
 reusing Flipkart's own blue, `#2874F0`/`#4FA3FF`, as a placeholder), and

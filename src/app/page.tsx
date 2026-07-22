@@ -28,7 +28,7 @@ import { getDemandIndex } from "@/lib/demand";
 import { buildTopSkuTable, TopSkuTableResult } from "@/lib/demand/sku-table";
 import { buildExecutiveSummary } from "@/lib/dashboard/summary";
 import { buildPoRows } from "@/lib/dashboard/po-rows";
-import { classifyStatus, isTerminalStatus, isLowValueCantDispatch } from "@/types/purchase-order";
+import { classifyStatus, isFullyExcludedStatus, isLowValueCantDispatch } from "@/types/purchase-order";
 import { MARKETPLACES } from "@/types/marketplace";
 
 function fmtNumber(n: number): string {
@@ -49,6 +49,8 @@ export default async function OverviewPage() {
   let summary: Awaited<ReturnType<typeof buildExecutiveSummary>> | null = null;
   let pendingRows: ReturnType<typeof buildPoRows> = [];
   let expiredRows: ReturnType<typeof buildPoRows> = [];
+  let dispatchedRows: ReturnType<typeof buildPoRows> = [];
+  let deliveredRows: ReturnType<typeof buildPoRows> = [];
   let needsReviewRows: ReturnType<typeof buildPoRows> = [];
   let hasRules = false;
   let demandError: string | null = null;
@@ -66,19 +68,26 @@ export default async function OverviewPage() {
     demandError = demand.error;
 
     // Status routing (confirmed): only "Pending" runs through the
-    // priority scoring chain. "Expired" gets its own section instead of
-    // being mixed into the ranked table. Terminal statuses and "Low Value
-    // Cant Dispatch" are excluded everywhere. Anything else (Price issue,
-    // Scheduled, Revised appt. required, ...) is unclassified ground —
-    // shown separately as "Needs Review" rather than silently scored.
-    const visiblePos = pos.filter((po) => !isTerminalStatus(po.status) && !isLowValueCantDispatch(po.status));
+    // priority scoring chain. "Expired", "Dispatched", and "Delivered"
+    // each get their own read-only section instead of being mixed into
+    // the ranked table — historical POs stay available for analytics/
+    // dispatch-performance rather than silently disappearing. Only
+    // Cancel/Cancelled/RTO Done/Low Value Cant Dispatch are excluded
+    // everywhere. Anything else (Price issue, Scheduled, Revised appt.
+    // required, ...) is unclassified ground — shown separately as
+    // "Needs Review" rather than silently scored.
+    const visiblePos = pos.filter((po) => !isFullyExcludedStatus(po.status) && !isLowValueCantDispatch(po.status));
     const pendingPos = visiblePos.filter((po) => classifyStatus(po.status) === "pending");
     const expiredPos = visiblePos.filter((po) => classifyStatus(po.status) === "expired");
+    const dispatchedPos = visiblePos.filter((po) => classifyStatus(po.status) === "dispatched");
+    const deliveredPos = visiblePos.filter((po) => classifyStatus(po.status) === "delivered");
     const needsReviewPos = visiblePos.filter((po) => classifyStatus(po.status) === "needs_review");
 
     summary = buildExecutiveSummary(visiblePos, rules, config, demandIndex);
     pendingRows = buildPoRows(pendingPos, rules, config, demandIndex);
     expiredRows = buildPoRows(expiredPos, rules, config, demandIndex);
+    dispatchedRows = buildPoRows(dispatchedPos, rules, config, demandIndex);
+    deliveredRows = buildPoRows(deliveredPos, rules, config, demandIndex);
     needsReviewRows = buildPoRows(needsReviewPos, rules, config, demandIndex);
     topSkuByMarketplace = Object.fromEntries(
       SUPPORTED_MARKETPLACES.map((m: SupportedMarketplace) => [m, buildTopSkuTable(m, demandIndex, pendingPos)])
@@ -132,10 +141,20 @@ export default async function OverviewPage() {
             <DemandIntelligenceTabs marketplaces={[...MARKETPLACES]} data={topSkuByMarketplace} />
             <details className="glass-card rounded-lg px-3 py-1.5 text-xs">
               <summary className="cursor-pointer select-none font-medium text-neutral-500">
-                Expired POs, Needs Review, and Charts
+                Expired, Dispatched, Delivered, Needs Review, and Charts
               </summary>
               <div className="mt-2 space-y-3 pb-1">
                 <SecondaryPoTable title="Expired POs" rows={expiredRows} />
+                <SecondaryPoTable
+                  title="Dispatched POs"
+                  note="Already shipped — read-only, kept for dispatch-performance history."
+                  rows={dispatchedRows}
+                />
+                <SecondaryPoTable
+                  title="Delivered POs"
+                  note="Fulfilled — read-only, kept for analytics/trends."
+                  rows={deliveredRows}
+                />
                 <SecondaryPoTable
                   title="Needs Review — status not yet classified"
                   note="Price issue, Scheduled, Revised appt. required, etc. — not run through priority scoring until confirmed how they should be handled."

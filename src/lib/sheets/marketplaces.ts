@@ -31,7 +31,6 @@ export interface TabConfig {
   // unrecognized marketplace — exactly the kind of silent wrong-data bug
   // this guards against).
   poNoColumn: string | null;
-  poLevelColumns: string[]; // columns that are only filled on a PO's first line
   // Only import POs raised in or after this year (filtered on PO Raised
   // Date, never Expiry Date). Unset = no floor, import everything — this
   // is a per-marketplace config value, not a hardcoded marketplace-name
@@ -52,19 +51,16 @@ export const TAB_CONFIG: Record<SupportedMarketplace, TabConfig> = {
     gidEnvKey: "GOOGLE_SHEET_GID_ZEPTO",
     headerRowIndex: 1,
     poNoColumn: "PO No.",
-    poLevelColumns: ["Status", "Appointment Date", "PO Date", "Expiry date", "Del Location", "PO No.", "Dispatch Date"],
   },
   Blinkit: {
     gidEnvKey: "GOOGLE_SHEET_GID_BLINKIT",
     headerRowIndex: 2,
     poNoColumn: "PO No",
-    poLevelColumns: ["Status", "Appt Date", "PO Date", "Expiry Date", "FC name", "PO No", "Dispatch Date"],
   },
   Instamart: {
     gidEnvKey: "GOOGLE_SHEET_GID_INSTAMART",
     headerRowIndex: 2,
     poNoColumn: "PO No",
-    poLevelColumns: ["Status", "Appt Date", "PO Date", "Expiry Date", "FC name", "PO No", "Dispatch Date"],
   },
   // Column mapping confirmed against the real sheet (2026-07): a merged
   // "Flipkart Minutes" title row sits above the real header, at an
@@ -75,19 +71,6 @@ export const TAB_CONFIG: Record<SupportedMarketplace, TabConfig> = {
     sheetUrlEnvKey: "FLIPKART_MINUTES_SHEET_URL",
     headerRowIndex: 0,
     poNoColumn: "PO number",
-    poLevelColumns: [
-      "Status",
-      "PO number",
-      "PO IssueDate",
-      "Expiry Date",
-      "Scheduled Date",
-      "City",
-      "Location",
-      "Frido Dispatch WH",
-      // Total PO Qty and FSN are deliberately NOT here — they're per-
-      // product-line fields (each row has its own quantity/SKU), never
-      // shared across a PO's lines, so they must never be forward-filled.
-    ],
     minPoRaisedYear: 2026,
     autoDetectHeader: true,
     requiredColumns: [
@@ -146,42 +129,30 @@ function detectHeaderRow(
   return { headerRowIndex: bestIndex, header };
 }
 
-// Each PO's shared fields (Status, dates, location, PO No) are only
-// entered on that PO's first line in the sheet — additional SKU line
-// items below it leave those columns blank (a standard "merged cell"
-// spreadsheet pattern). Forward-filling reattaches each blank line to the
-// PO above it before grouping; without this, continuation lines look like
-// broken, date-less POs of their own.
+// Each PO's SKU line items are only entered with a PO Number on the
+// sheet's own terms — some sheets blank it out on continuation rows
+// (Zepto/Blinkit/Instamart), so this fills it forward before grouping;
+// without this, continuation lines would have no PO Number to group by
+// and get silently dropped (aggregateLineItems skips poNo-less lines).
 //
-// Whether a row is a continuation is decided ONCE, off poNoColumn alone
-// — not independently per column. The previous version filled each
-// column separately ("if this cell is blank, reuse the last non-blank
-// value seen for that column"), which is wrong for any column that can
-// be genuinely blank on a real, new PO (e.g. a PO with no Scheduled Date
-// yet): a brand-new PO's row would silently inherit an unrelated
-// PREVIOUS PO's value for that column instead of staying blank. Caught
-// by a synthetic test while wiring up Flipkart Minutes, not something
-// specific to it — this bug shape was equally possible for Zepto/
-// Blinkit/Instamart's Appointment Date whenever it's legitimately unset.
-function forwardFillPoLevelColumns(
-  rows: Record<string, string>[],
-  columns: string[],
-  poNoColumn: string
-): Record<string, string>[] {
-  const last: Record<string, string> = {};
+// This ONLY forward-fills the grouping key, deliberately not the other
+// PO-level fields (Status, dates, City, Location, ...) anymore — a
+// previous version forward-filled those too, assuming the row carrying
+// their real values was always the group's FIRST row. That's true for
+// Zepto/Blinkit/Instamart, but not guaranteed in general: a merged cell
+// can visually/structurally anchor its value to ANY row in the block
+// (seen on Flipkart Minutes — Status was only genuinely populated on one
+// row in the middle of a multi-line PO, so forward-fill alone could
+// never backfill the earlier rows, which come before it in the file).
+// aggregateLineItems now resolves each PO-level field by scanning the
+// WHOLE group for the first non-blank value instead, which is correct
+// regardless of which row happens to carry the real data.
+function forwardFillPoNumber(rows: Record<string, string>[], poNoColumn: string): Record<string, string>[] {
+  let last = "";
   return rows.map((row) => {
-    const isContinuation = !row[poNoColumn]?.trim();
-    const filled = { ...row };
-    if (isContinuation) {
-      for (const col of columns) {
-        filled[col] = last[col] ?? "";
-      }
-    } else {
-      for (const col of columns) {
-        last[col] = filled[col] ?? "";
-      }
-    }
-    return filled;
+    const raw = row[poNoColumn]?.trim();
+    if (raw) last = raw;
+    return { ...row, [poNoColumn]: raw || last };
   });
 }
 
@@ -281,6 +252,20 @@ function toLineItem(
   }
 }
 
+// Picks the first non-blank value for a PO-level field across an entire
+// line-item group, rather than trusting group[0] ("first"). A merged
+// cell's real value can be exported anchored to ANY row within its block
+// — not necessarily the first (confirmed on Flipkart Minutes: Status was
+// only genuinely populated on one row in the middle of a multi-line PO) —
+// so this must be position-independent to be correct for every sheet.
+function firstNonBlank<T extends string | null>(group: LineItem[], select: (line: LineItem) => T): T {
+  for (const line of group) {
+    const value = select(line);
+    if (value !== null && value !== "") return value;
+  }
+  return select(group[0]);
+}
+
 // Groups SKU line items back up into one row per PO Number (confirmed
 // approach, matching the BigBasket PO-level-aggregation decision), summing
 // quantities/value across lines and keeping the shared PO-level fields.
@@ -300,6 +285,13 @@ function aggregateLineItems(
   const purchaseOrders: PurchaseOrder[] = [];
   for (const [poNo, group] of byPoNo) {
     const first = group[0];
+    const city = firstNonBlank(group, (l) => l.city);
+    const warehouse = firstNonBlank(group, (l) => l.warehouse);
+    const status = firstNonBlank(group, (l) => l.status);
+    const poRaisedDate = firstNonBlank(group, (l) => l.poRaisedDate);
+    const expiryDate = firstNonBlank(group, (l) => l.expiryDate);
+    const appointmentDate = firstNonBlank(group, (l) => l.appointmentDate);
+    const dispatchDate = firstNonBlank(group, (l) => l.dispatchDate);
     let orderedQty = 0;
     let dispatchedQty = 0;
     let poValue: number | null = 0;
@@ -341,22 +333,22 @@ function aggregateLineItems(
     purchaseOrders.push({
       id: poNo,
       marketplace,
-      city: first.city,
-      warehouse: first.warehouse,
+      city,
+      warehouse,
       sku: group.length > 1 ? `${first.sku} +${group.length - 1} more` : first.sku,
       skuDescription:
         group.length > 1 ? `${first.skuDescription} +${group.length - 1} more` : first.skuDescription,
       skus: [...new Set(group.map((line) => line.sku).filter(Boolean))],
       lineItems: [...lineItemsBySku.values()],
-      poRaisedDate: first.poRaisedDate ?? "",
-      expiryDate: first.expiryDate ?? "",
-      appointmentDate: first.appointmentDate,
-      dispatchDate: first.dispatchDate,
+      poRaisedDate: poRaisedDate ?? "",
+      expiryDate: expiryDate ?? "",
+      appointmentDate,
+      dispatchDate,
       orderedQty,
       dispatchedQty,
       pendingQty: Math.max(0, orderedQty - dispatchedQty),
       poValue,
-      status: first.status,
+      status,
       raw: { lineItems: group },
     });
   }
@@ -371,7 +363,7 @@ export async function fetchPurchaseOrders(
   const config = TAB_CONFIG[marketplace];
   if (config.poNoColumn === null) {
     throw new Error(
-      `${marketplace}'s sheet column layout hasn't been confirmed yet — set poNoColumn/poLevelColumns in TAB_CONFIG (src/lib/sheets/marketplaces.ts) against the real sheet before importing.`
+      `${marketplace}'s sheet column layout hasn't been confirmed yet — set poNoColumn (and, if needed, autoDetectHeader/requiredColumns) in TAB_CONFIG (src/lib/sheets/marketplaces.ts) against the real sheet before importing.`
     );
   }
   const gid = process.env[config.gidEnvKey];
@@ -404,7 +396,7 @@ export async function fetchPurchaseOrders(
     rawRows = await readSheetTab(gid, config.headerRowIndex, sheetId);
   }
 
-  const filledRows = forwardFillPoLevelColumns(rawRows, config.poLevelColumns, config.poNoColumn);
+  const filledRows = forwardFillPoNumber(rawRows, config.poNoColumn);
   const lines = filledRows.map((row) => toLineItem(row, marketplace));
   // Returns every PO regardless of status — Executive Summary decides
   // which statuses count as "active" per metric (see buildExecutiveSummary).
