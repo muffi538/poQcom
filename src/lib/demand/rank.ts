@@ -31,6 +31,15 @@ export function scoreForRank(rank: number): number {
   return 0;
 }
 
+// Bar for the visible "High Demand" badge/filter (UI-only distinction —
+// scoring above is unaffected). With a marketplace catalog as small as
+// Zepto's (~57 SKUs), "rank <= 50" covers nearly every SKU that has any
+// sales data at all, so gating the badge on that would flag ~100% of POs
+// and say nothing. Rank <= 15 (the two highest-value tiers, +25/+15)
+// keeps the badge meaning "a genuine top seller," not "appears anywhere
+// in the sheet."
+export const HIGH_DEMAND_RANK_THRESHOLD = 15;
+
 // Builds the per-marketplace demand rank index from the raw sales rows.
 // Duplicate (platform, Master SKU) rows in the sheet (confirmed present —
 // 56/144 combos on the sample data) are summed before ranking, so a SKU

@@ -8,6 +8,7 @@ import { MarketplaceBadge } from "./marketplace-badge";
 import { OperationalDelayBadge } from "./operational-delay";
 import { PoDetailPanel } from "./po-detail-panel";
 import { fmtCurrency } from "./po-format";
+import { HIGH_DEMAND_RANK_THRESHOLD } from "@/lib/demand/rank";
 
 type SortKey =
   | "priority"
@@ -134,8 +135,8 @@ export function PoControlTower({ rows, marketplaces, hasRules }: Props) {
     {
       key: "highDemand",
       label: "High Demand",
-      count: rows.filter((r) => r.demandHits.length > 0).length,
-      test: (r) => r.demandHits.length > 0,
+      count: rows.filter((r) => r.demandHits.some((h) => h.rank <= HIGH_DEMAND_RANK_THRESHOLD)).length,
+      test: (r) => r.demandHits.some((h) => h.rank <= HIGH_DEMAND_RANK_THRESHOLD),
     },
     {
       key: "lowValue",
@@ -282,7 +283,8 @@ export function PoControlTower({ rows, marketplaces, hasRules }: Props) {
             <tbody className="divide-y divide-neutral-100 text-[12px] dark:divide-white/5">
               {sorted.map((r) => {
                 const topHit = r.demandHits[0];
-                const demandTag = topHit ? `Top SKU #${topHit.rank} (${r.po.marketplace})` : null;
+                const isHighDemand = topHit !== undefined && topHit.rank <= HIGH_DEMAND_RANK_THRESHOLD;
+                const demandTag = isHighDemand ? `Top SKU #${topHit.rank} (${r.po.marketplace})` : null;
                 const reason = [demandTag, r.rulesTriggered.join(", "), r.recommendedAction]
                   .filter(Boolean)
                   .join(" → ");
@@ -342,7 +344,7 @@ export function PoControlTower({ rows, marketplaces, hasRules }: Props) {
                     </td>
                     <td className="px-1.5 py-1 text-center">{r.isMetroCity ? "●" : ""}</td>
                     <td className="px-1.5 py-1 text-center" title={demandTitle}>
-                      {topHit && <Flame size={12} className="mx-auto text-[#ec835a]" />}
+                      {isHighDemand && <Flame size={12} className="mx-auto text-[#ec835a]" />}
                     </td>
                     <td className="truncate px-1.5 py-1 text-neutral-500" title={reason || undefined}>
                       {reason || "—"}

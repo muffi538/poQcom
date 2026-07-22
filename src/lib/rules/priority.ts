@@ -4,7 +4,7 @@ import { EngineConfig, levelForScore } from "@/lib/config/store";
 import { computeTimeline } from "@/lib/po/derived";
 import { buildEvalContext } from "./context";
 import { runRules } from "./engine";
-import { DemandIndex } from "@/lib/demand/rank";
+import { DemandIndex, HIGH_DEMAND_RANK_THRESHOLD } from "@/lib/demand/rank";
 import { computeDemandContribution } from "@/lib/demand/score-po";
 
 const EMPTY_DEMAND_INDEX: DemandIndex = new Map();
@@ -53,7 +53,9 @@ export function computePoPriority(
     level: hasSignal ? levelForScore(totalScore, config.levelThresholds) : "Unscored",
     appliedRuleIds: result.appliedRuleIds,
     skippedRuleIds: result.skippedRuleIds,
-    flags: demand.hits.some((h) => h.rank <= 5) ? [...result.flags, "High-Demand SKU"] : result.flags,
+    flags: demand.hits.some((h) => h.rank <= HIGH_DEMAND_RANK_THRESHOLD)
+      ? [...result.flags, "High-Demand SKU"]
+      : result.flags,
     confidence: result.confidence,
     explanation: [...result.explanation, ...demandExplanation],
     recommendedActions: result.recommendedActions,
