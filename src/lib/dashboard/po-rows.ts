@@ -1,4 +1,4 @@
-import { PurchaseOrder } from "@/types/purchase-order";
+import { PurchaseOrder, DemandSkuHit } from "@/types/purchase-order";
 import { Rule } from "@/types/rules";
 import { EngineConfig, levelForScore } from "@/lib/config/store";
 import { computeTimeline } from "@/lib/po/derived";
@@ -33,6 +33,7 @@ export interface PoRow {
   appointmentScheduledTooLate: boolean;
   isMetroCity: boolean;
   cityWorkloadBonus: boolean; // this PO's city has the most POs in this batch (+5, confirmed)
+  demandHits: DemandSkuHit[]; // this PO's SKUs that are top-selling in its marketplace's sales data, best rank first
   flags: string[];
   rulesTriggered: string[]; // rule names, not just ids
   recommendedAction: string | null;
@@ -87,6 +88,7 @@ export function buildPoRows(
       appointmentScheduledTooLate: timeline.appointmentScheduledTooLate,
       isMetroCity: timeline.isMetroCity,
       cityWorkloadBonus: isTopCity,
+      demandHits: priority.demandHits,
       flags: priority.flags,
       rulesTriggered: priority.appliedRuleIds.map((id) => rulesById.get(id)?.name ?? id),
       recommendedAction: priority.recommendedActions[0] ?? null,

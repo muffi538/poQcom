@@ -97,7 +97,17 @@ export interface PoTimeline {
   isMetroCity: boolean;
 }
 
-// Output of the (not-yet-built) priority engine for one PO.
+// One of this PO's SKUs that matched the Demand Intelligence sales data
+// for its own marketplace — structured (not just prose) so the UI can
+// render a visible tag/badge, not only a buried explanation sentence.
+export interface DemandSkuHit {
+  sku: string;
+  rank: number; // #1 = highest GMV within this marketplace's sales data
+  gmv: number;
+  points: number; // this hit's contribution to the PO's score
+}
+
+// Output of the priority engine for one PO.
 export interface PoPriorityResult {
   poId: string;
   score: number;
@@ -108,4 +118,5 @@ export interface PoPriorityResult {
   confidence: number;
   explanation: string[];
   recommendedActions: string[];
+  demandHits: DemandSkuHit[]; // sorted best-rank first; empty when no SKU on this PO has sales data
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search, SearchX, ArrowUpDown, MapPinned, AlertTriangle } from "lucide-react";
+import { Search, SearchX, ArrowUpDown, MapPinned, AlertTriangle, Flame } from "lucide-react";
 import { PoRow } from "@/lib/dashboard/po-rows";
 import { PriorityBadge } from "./priority-badge";
 import { MarketplaceBadge } from "./marketplace-badge";
@@ -60,6 +60,7 @@ const COL = {
   expiry: 76,
   delay: 100,
   metro: 34,
+  demand: 34,
 };
 const STICKY_LEFT = {
   rank: 0,
@@ -82,7 +83,15 @@ interface Props {
   hasRules: boolean;
 }
 
-type QuickFilter = "overdue" | "expiringSoon" | "dispatchToday" | "delayedAppt" | "metro" | "lowValue" | "critical";
+type QuickFilter =
+  | "overdue"
+  | "expiringSoon"
+  | "dispatchToday"
+  | "delayedAppt"
+  | "metro"
+  | "highDemand"
+  | "lowValue"
+  | "critical";
 
 export function PoControlTower({ rows, marketplaces, hasRules }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>("priority");
@@ -122,6 +131,12 @@ export function PoControlTower({ rows, marketplaces, hasRules }: Props) {
       test: (r) => (r.appointmentDelayDays ?? 0) > 0,
     },
     { key: "metro", label: "Metro", count: rows.filter((r) => r.isMetroCity).length, test: (r) => r.isMetroCity },
+    {
+      key: "highDemand",
+      label: "High Demand",
+      count: rows.filter((r) => r.demandHits.length > 0).length,
+      test: (r) => r.demandHits.length > 0,
+    },
     {
       key: "lowValue",
       label: "Low Value",
@@ -228,6 +243,7 @@ export function PoControlTower({ rows, marketplaces, hasRules }: Props) {
               <col style={{ width: COL.expiry }} />
               <col style={{ width: COL.delay }} />
               <col style={{ width: COL.metro }} />
+              <col style={{ width: COL.demand }} />
               <col />
             </colgroup>
             <thead className="sticky top-0 z-20 bg-white/95 text-[10px] font-semibold uppercase tracking-wide text-neutral-500 backdrop-blur dark:bg-neutral-900/95">
@@ -257,12 +273,24 @@ export function PoControlTower({ rows, marketplaces, hasRules }: Props) {
                 <th className="px-1.5 py-1.5" title="Metro city">
                   <MapPinned size={11} />
                 </th>
+                <th className="px-1.5 py-1.5" title="Demand Intelligence: contains a top-selling SKU for this marketplace">
+                  <Flame size={11} />
+                </th>
                 <th className="px-1.5 py-1.5">Reason / Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100 text-[12px] dark:divide-white/5">
               {sorted.map((r) => {
-                const reason = [r.rulesTriggered.join(", "), r.recommendedAction].filter(Boolean).join(" → ");
+                const topHit = r.demandHits[0];
+                const demandTag = topHit ? `Top SKU #${topHit.rank} (${r.po.marketplace})` : null;
+                const reason = [demandTag, r.rulesTriggered.join(", "), r.recommendedAction]
+                  .filter(Boolean)
+                  .join(" → ");
+                const demandTitle = r.demandHits.length
+                  ? r.demandHits
+                      .map((h) => `${h.sku} — ${r.po.marketplace} #${h.rank} best-seller (${fmtCurrency(h.gmv)} GMV, +${h.points})`)
+                      .join("\n")
+                  : undefined;
                 return (
                   <tr
                     key={r.po.id}
@@ -313,6 +341,9 @@ export function PoControlTower({ rows, marketplaces, hasRules }: Props) {
                       <OperationalDelayBadge days={r.operationalDelayDays} compact />
                     </td>
                     <td className="px-1.5 py-1 text-center">{r.isMetroCity ? "●" : ""}</td>
+                    <td className="px-1.5 py-1 text-center" title={demandTitle}>
+                      {topHit && <Flame size={12} className="mx-auto text-[#ec835a]" />}
+                    </td>
                     <td className="truncate px-1.5 py-1 text-neutral-500" title={reason || undefined}>
                       {reason || "—"}
                     </td>
