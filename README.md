@@ -285,26 +285,69 @@ What's generic and done:
   one unconfigured marketplace no longer takes the whole Overview page
   down for the ones that do work.
 
-What's still open — **needs the real sheet, not guessed**, same as every
-other tab/workbook connected in this project:
-- Column layout (`poNoColumn`, `poLevelColumns`, `headerRowIndex` in
-  `TAB_CONFIG`) and its own `toLineItem` case — PO Number/City-or-FC/SKU/
-  date column names, whether it tracks Dispatched Qty separately, header
-  row offset. `fetchPurchaseOrders("Flipkart Minutes")` throws a clear
-  "not yet mapped" error rather than guessing (visible today as the
-  Awaiting Config message on its marketplace page).
-- A city-derivation function for its FC-name or location format (see
-  `src/lib/po/city.ts`'s three existing per-marketplace parsers).
-- Confirming its brand color (currently reusing Flipkart's own blue,
-  `#2874F0`/`#4FA3FF`, as a placeholder).
+**Column mapping confirmed** (2026-07) — `TAB_CONFIG["Flipkart Minutes"]`
+in `src/lib/sheets/marketplaces.ts`:
+
+| Our field | Sheet column |
+|---|---|
+| Status | `Status` |
+| PO Number | `PO number` |
+| PO Raised Date | `PO IssueDate` |
+| Expiry Date | `Expiry Date` |
+| Appointment Date | `Scheduled Date` |
+| City | `City` (read directly — no derivation, unlike Zepto/Blinkit/Instamart) |
+| Warehouse/FC | `Location` |
+| SKU | `FSN` |
+| Ordered Qty | `Total PO Qty` |
+
+Not modeled on the shared `PurchaseOrder` type (no other marketplace has
+these): `Frido Dispatch WH` is captured on each line item and carried
+through in `raw.lineItems` but not surfaced in the UI yet; there's no
+Dispatch Date or Dispatched Qty column, so those stay `null`/`0` (Avg
+Dispatch Time simply won't count Flipkart Minutes POs, the same way it
+already skips any PO without a Dispatch Date); there's no separate SKU
+description column, so `skuDescription` is empty.
+
+The sheet has a merged "Flipkart Minutes" title row above the real
+header at no fixed offset, so its header row is **auto-detected**
+(`autoDetectHeader: true` + `requiredColumns`) rather than a hardcoded
+row index — scans the first 20 rows for whichever one contains every
+required column name, and throws a clear "required column X not found"
+error (naming the column) if the sheet is missing one it needs, rather
+than silently parsing the wrong row as the header. `fetchPurchaseOrders`
+also logs a one-line summary on every fetch (any marketplace, not just
+this one): total POs parsed, product rows parsed, and Pending/Delivered/
+Cancelled counts — a standing sanity check, not a one-off.
+
+**Bug found and fixed while wiring this up** (pre-existing, not specific
+to Flipkart Minutes): `forwardFillPoLevelColumns` used to decide
+"is this cell blank, so reuse the last value" independently *per column*.
+That's wrong for any column that can be legitimately blank on a real,
+new PO (e.g. no Scheduled Date yet) — a brand-new PO's row would
+silently inherit an unrelated *previous* PO's value for that column
+instead of staying blank. A synthetic test (a mocked sheet fed through
+the real `fetchPurchaseOrders` pipeline, since there's no test framework
+in this project yet) caught it: a Cancelled PO with no Scheduled Date
+came back with the *previous* PO's Scheduled Date instead of null. Fixed
+by deciding "is this row a continuation" once, off `PO Number` alone,
+instead of column-by-column. Re-verified against the real Zepto sheet
+afterward — identical scores/ranks to before the fix, as expected (this
+bug shape needs a genuinely-blank PO-level field on a brand-new PO's row
+to trigger, which Zepto/Blinkit/Instamart's real data apparently never
+hits, but Flipkart Minutes' Scheduled Date does).
+
+Still open: confirming Flipkart Minutes' own brand color (currently
+reusing Flipkart's own blue, `#2874F0`/`#4FA3FF`, as a placeholder), and
+setting `GOOGLE_SHEET_GID_FLIPKART_MINUTES` (plus `FLIPKART_MINUTES_
+SHEET_URL` if it's a separate workbook) wherever this runs.
 
 Also flagged, not yet built (bigger, and applies to **all** marketplaces
 once scoped, not a Flipkart-specific ask): Top Cities / Top FCs / Top
 SKUs dashboard widgets, a Year/Status/Expiry-Window/Top-SKU filter set,
 and a dedicated Reports section — none of these exist for Zepto/Blinkit/
-Instamart today either, so building them once the sheet is connected (and
-real data can validate them) is a separate, explicitly scoped follow-up
-rather than something silently dropped.
+Instamart today either, so building them once real data can validate
+them is a separate, explicitly scoped follow-up rather than something
+silently dropped.
 
 ## Confirmed but not yet implemented
 

@@ -1,4 +1,4 @@
-import { readSheetTab, extractSheetId } from "./client";
+import { readSheetTab, readSheetTabRaw, extractSheetId } from "./client";
 import { loadSkuCostPriceMap } from "./price-master";
 import { PurchaseOrder, PoLineItem } from "@/types/purchase-order";
 import { parseSheetDate } from "@/lib/po/dates";
@@ -37,6 +37,14 @@ export interface TabConfig {
   // is a per-marketplace config value, not a hardcoded marketplace-name
   // check, so any marketplace's sheet can opt into it.
   minPoRaisedYear?: number;
+  // When set, headerRowIndex is ignored and the header row is instead
+  // found by scanning for whichever row contains all of requiredColumns —
+  // so a sheet's cosmetic title rows (e.g. a merged "Flipkart Minutes"
+  // banner row) don't need a hardcoded row-offset number. Throws a clear
+  // "missing column X" error rather than guessing if a required column
+  // genuinely isn't in the detected header row.
+  autoDetectHeader?: boolean;
+  requiredColumns?: string[];
 }
 
 export const TAB_CONFIG: Record<SupportedMarketplace, TabConfig> = {
@@ -58,18 +66,40 @@ export const TAB_CONFIG: Record<SupportedMarketplace, TabConfig> = {
     poNoColumn: "PO No",
     poLevelColumns: ["Status", "Appt Date", "PO Date", "Expiry Date", "FC name", "PO No", "Dispatch Date"],
   },
-  // Column layout intentionally not filled in — no real sheet has been
-  // inspected yet (confirmed practice for every tab in this project:
-  // Zepto/Blinkit/Instamart/EAN/sales sheet were all connected only after
-  // seeing real column headers, never guessed). Once the sheet is shared,
-  // fill in poNoColumn/poLevelColumns/headerRowIndex the same way.
+  // Column mapping confirmed against the real sheet (2026-07): a merged
+  // "Flipkart Minutes" title row sits above the real header, at an
+  // unspecified/variable offset, so headerRowIndex isn't used here —
+  // autoDetectHeader scans for it instead (see detectHeaderRow below).
   "Flipkart Minutes": {
     gidEnvKey: "GOOGLE_SHEET_GID_FLIPKART_MINUTES",
     sheetUrlEnvKey: "FLIPKART_MINUTES_SHEET_URL",
     headerRowIndex: 0,
-    poNoColumn: null,
-    poLevelColumns: [],
+    poNoColumn: "PO number",
+    poLevelColumns: [
+      "Status",
+      "PO number",
+      "PO IssueDate",
+      "Expiry Date",
+      "Scheduled Date",
+      "City",
+      "Location",
+      "Frido Dispatch WH",
+      // Total PO Qty and FSN are deliberately NOT here — they're per-
+      // product-line fields (each row has its own quantity/SKU), never
+      // shared across a PO's lines, so they must never be forward-filled.
+    ],
     minPoRaisedYear: 2026,
+    autoDetectHeader: true,
+    requiredColumns: [
+      "Status",
+      "PO number",
+      "PO IssueDate",
+      "Expiry Date",
+      "City",
+      "Location",
+      "Total PO Qty",
+      "FSN",
+    ],
   },
 };
 
@@ -78,24 +108,77 @@ function num(value: string | undefined): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+// Scans the first few rows for whichever one contains every required
+// column name exactly — so a sheet's merged/cosmetic title row above the
+// real header doesn't need a hardcoded row-offset number (confirmed
+// requirement: "do not hardcode row numbers", "detect columns using the
+// header names"). Throws naming exactly which required column is
+// missing, rather than silently parsing the wrong row as if it were the
+// header.
+function detectHeaderRow(
+  rows: string[][],
+  requiredColumns: string[],
+  marketplace: string,
+  scanLimit = 20
+): { headerRowIndex: number; header: string[] } {
+  const limit = Math.min(scanLimit, rows.length);
+  let bestIndex = -1;
+  let bestMatchCount = -1;
+  for (let i = 0; i < limit; i++) {
+    const matchCount = requiredColumns.filter((col) => rows[i].includes(col)).length;
+    if (matchCount > bestMatchCount) {
+      bestMatchCount = matchCount;
+      bestIndex = i;
+    }
+  }
+  if (bestIndex === -1) {
+    throw new Error(`${marketplace}: sheet appears to be empty — no header row found.`);
+  }
+
+  const header = rows[bestIndex];
+  const missing = requiredColumns.filter((col) => !header.includes(col));
+  if (missing.length > 0) {
+    throw new Error(
+      `${marketplace}: required column(s) not found in the sheet: ${missing.join(", ")}. ` +
+        `Closest header row (row ${bestIndex + 1}) contains: ${header.filter(Boolean).join(", ")}.`
+    );
+  }
+  return { headerRowIndex: bestIndex, header };
+}
+
 // Each PO's shared fields (Status, dates, location, PO No) are only
 // entered on that PO's first line in the sheet — additional SKU line
 // items below it leave those columns blank (a standard "merged cell"
 // spreadsheet pattern). Forward-filling reattaches each blank line to the
 // PO above it before grouping; without this, continuation lines look like
 // broken, date-less POs of their own.
+//
+// Whether a row is a continuation is decided ONCE, off poNoColumn alone
+// — not independently per column. The previous version filled each
+// column separately ("if this cell is blank, reuse the last non-blank
+// value seen for that column"), which is wrong for any column that can
+// be genuinely blank on a real, new PO (e.g. a PO with no Scheduled Date
+// yet): a brand-new PO's row would silently inherit an unrelated
+// PREVIOUS PO's value for that column instead of staying blank. Caught
+// by a synthetic test while wiring up Flipkart Minutes, not something
+// specific to it — this bug shape was equally possible for Zepto/
+// Blinkit/Instamart's Appointment Date whenever it's legitimately unset.
 function forwardFillPoLevelColumns(
   rows: Record<string, string>[],
-  columns: string[]
+  columns: string[],
+  poNoColumn: string
 ): Record<string, string>[] {
   const last: Record<string, string> = {};
   return rows.map((row) => {
+    const isContinuation = !row[poNoColumn]?.trim();
     const filled = { ...row };
-    for (const col of columns) {
-      if (filled[col]?.trim()) {
-        last[col] = filled[col];
-      } else {
+    if (isContinuation) {
+      for (const col of columns) {
         filled[col] = last[col] ?? "";
+      }
+    } else {
+      for (const col of columns) {
+        last[col] = filled[col] ?? "";
       }
     }
     return filled;
@@ -115,6 +198,12 @@ interface LineItem {
   orderedQty: number;
   dispatchedQty: number;
   status: string;
+  // Flipkart Minutes only ("Frido Dispatch WH" — which of Frido's own
+  // warehouses fulfills this PO, distinct from `warehouse`/City which are
+  // the marketplace's destination FC). Not modeled on the shared
+  // PurchaseOrder type since no other marketplace has this concept;
+  // carried through in `raw.lineItems` for now.
+  dispatchWarehouse?: string;
 }
 
 // Exhaustive per-marketplace dispatch (confirmed fix: this used to be an
@@ -162,6 +251,26 @@ function toLineItem(
         orderedQty: num(row["PO Qty"]),
         dispatchedQty: num(row["Dispatched Qty"]),
         status: row["Status"] ?? "",
+      };
+    }
+    case "Flipkart Minutes": {
+      // Sheet provides City directly (unlike the other three, which
+      // derive it from a location/FC code) — no city-parser needed.
+      const warehouse = row["Location"] ?? "";
+      return {
+        poNo: row["PO number"] ?? "",
+        warehouse,
+        city: row["City"] ?? "",
+        sku: row["FSN"] ?? "",
+        skuDescription: "", // no separate product-name/description column in this sheet
+        poRaisedDate: parseSheetDate(row["PO IssueDate"]),
+        expiryDate: parseSheetDate(row["Expiry Date"]),
+        appointmentDate: parseSheetDate(row["Scheduled Date"]),
+        dispatchDate: null, // no Dispatch Date column in this sheet
+        orderedQty: num(row["Total PO Qty"]),
+        dispatchedQty: 0, // no Dispatched Qty column in this sheet
+        status: row["Status"] ?? "",
+        dispatchWarehouse: row["Frido Dispatch WH"] || undefined,
       };
     }
     default:
@@ -271,44 +380,73 @@ export async function fetchPurchaseOrders(
       `No sheet tab configured for ${marketplace}. Set ${config.gidEnvKey} in .env — see Settings.`
     );
   }
+  // sheetUrlEnvKey is an optional override, not a requirement — when it's
+  // declared on a marketplace's config but the env var itself isn't set,
+  // that marketplace simply lives in the shared GOOGLE_SHEET_URL workbook
+  // (readSheetTab already falls back to it when no override is passed).
   const sheetIdOverride = config.sheetUrlEnvKey ? process.env[config.sheetUrlEnvKey] : undefined;
-  if (config.sheetUrlEnvKey && !sheetIdOverride) {
-    throw new Error(
-      `No sheet configured for ${marketplace}. Set ${config.sheetUrlEnvKey} in .env — see Settings.`
-    );
-  }
 
   const resolvedPriceMap = priceMap ?? (await loadSkuCostPriceMap());
-  const rawRows = await readSheetTab(
-    gid,
-    config.headerRowIndex,
-    sheetIdOverride ? extractSheetId(sheetIdOverride) : undefined
-  );
-  const filledRows = forwardFillPoLevelColumns(rawRows, config.poLevelColumns);
+  const sheetId = sheetIdOverride ? extractSheetId(sheetIdOverride) : undefined;
+
+  let rawRows: Record<string, string>[];
+  if (config.autoDetectHeader) {
+    const allRows = await readSheetTabRaw(gid, sheetId);
+    const { headerRowIndex, header } = detectHeaderRow(
+      allRows,
+      config.requiredColumns ?? [],
+      marketplace
+    );
+    rawRows = allRows
+      .slice(headerRowIndex + 1)
+      .map((row) => Object.fromEntries(header.map((col, i) => [col, row[i] ?? ""])));
+  } else {
+    rawRows = await readSheetTab(gid, config.headerRowIndex, sheetId);
+  }
+
+  const filledRows = forwardFillPoLevelColumns(rawRows, config.poLevelColumns, config.poNoColumn);
   const lines = filledRows.map((row) => toLineItem(row, marketplace));
   // Returns every PO regardless of status — Executive Summary decides
   // which statuses count as "active" per metric (see buildExecutiveSummary).
-  const purchaseOrders = aggregateLineItems(lines, marketplace, resolvedPriceMap);
+  let purchaseOrders = aggregateLineItems(lines, marketplace, resolvedPriceMap);
 
-  if (config.minPoRaisedYear === undefined) return purchaseOrders;
+  if (config.minPoRaisedYear !== undefined) {
+    // Year floor (confirmed, filtered on PO Raised Date, never Expiry
+    // Date): a row with no parseable PO Raised Date can't be judged
+    // against the floor, so it's logged and skipped rather than guessed
+    // into either bucket — one bad row shouldn't stop the rest of the
+    // import.
+    const floor = config.minPoRaisedYear;
+    purchaseOrders = purchaseOrders.filter((po) => {
+      if (!po.poRaisedDate) {
+        console.warn(`[${marketplace}] Skipping PO ${po.id}: no parseable PO Raised Date.`);
+        return false;
+      }
+      const year = Number(po.poRaisedDate.slice(0, 4));
+      if (!Number.isFinite(year)) {
+        console.warn(`[${marketplace}] Skipping PO ${po.id}: unparseable PO Raised Date "${po.poRaisedDate}".`);
+        return false;
+      }
+      return year >= floor;
+    });
+  }
 
-  // Year floor (confirmed, filtered on PO Raised Date, never Expiry
-  // Date): a row with no parseable PO Raised Date can't be judged against
-  // the floor, so it's logged and skipped rather than guessed into either
-  // bucket — one bad row shouldn't stop the rest of the import.
-  const floor = config.minPoRaisedYear;
-  return purchaseOrders.filter((po) => {
-    if (!po.poRaisedDate) {
-      console.warn(`[${marketplace}] Skipping PO ${po.id}: no parseable PO Raised Date.`);
-      return false;
-    }
-    const year = Number(po.poRaisedDate.slice(0, 4));
-    if (!Number.isFinite(year)) {
-      console.warn(`[${marketplace}] Skipping PO ${po.id}: unparseable PO Raised Date "${po.poRaisedDate}".`);
-      return false;
-    }
-    return year >= floor;
-  });
+  // Import-time sanity log (generic — runs for every marketplace, not
+  // just the newly-connected one, so it's a standing diagnostic rather
+  // than a one-off check): total POs/product rows parsed, plus counts for
+  // the three statuses most likely to reveal a broken import (nothing
+  // Pending = priority engine has nothing to rank; nothing Delivered/
+  // Cancelled on an established sheet may mean Status isn't matching).
+  const statusCount = (needle: string) =>
+    purchaseOrders.filter((po) => po.status.trim().toLowerCase() === needle).length;
+  console.log(
+    `[${marketplace}] Parsed ${purchaseOrders.length} POs from ${lines.length} product rows — ` +
+      `Pending: ${statusCount("pending")}, Delivered: ${statusCount("delivered")}, Cancelled: ${
+        statusCount("cancel") + statusCount("cancelled")
+      }.`
+  );
+
+  return purchaseOrders;
 }
 
 // One unconfigured or not-yet-connected marketplace (e.g. Flipkart

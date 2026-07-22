@@ -42,10 +42,13 @@ export default async function SettingsPage() {
             {SUPPORTED_MARKETPLACES.map((m) => {
               const tab = TAB_CONFIG[m];
               const gidConfigured = Boolean(process.env[tab.gidEnvKey]);
-              const sheetConfigured = tab.sheetUrlEnvKey ? Boolean(process.env[tab.sheetUrlEnvKey]) : true;
+              // sheetUrlEnvKey is an optional per-marketplace override, not
+              // a requirement — unset just means this marketplace lives in
+              // the shared GOOGLE_SHEET_URL workbook, not "missing".
+              const usingSeparateSheet = Boolean(tab.sheetUrlEnvKey && process.env[tab.sheetUrlEnvKey]);
               const columnsMapped = tab.poNoColumn !== null;
-              const ok = gidConfigured && sheetConfigured && columnsMapped;
-              let detail = `${tab.gidEnvKey}${tab.sheetUrlEnvKey ? `, ${tab.sheetUrlEnvKey}` : ""}`;
+              const ok = gidConfigured && columnsMapped;
+              let detail = `${tab.gidEnvKey}${usingSeparateSheet ? `, ${tab.sheetUrlEnvKey}` : ""}`;
               if (!columnsMapped) detail = "column layout not yet mapped — see TAB_CONFIG";
               return (
                 <li key={m} className="flex items-center gap-1.5">
