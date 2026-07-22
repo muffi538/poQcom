@@ -1,12 +1,15 @@
 "use client";
 
-import { X, Sparkles, Flag, ArrowRight, PackageSearch, AlertTriangle } from "lucide-react";
+import { X, Sparkles, Flag, ArrowRight, PackageSearch, AlertTriangle, TrendingUp } from "lucide-react";
 import { PoRow } from "@/lib/dashboard/po-rows";
 import { PriorityBadge } from "./priority-badge";
 import { StatusBadge } from "./status-badge";
 import { MarketplaceBadge } from "./marketplace-badge";
 import { formatOperationalDelay } from "./operational-delay";
 import { fmtDate, fmtCurrency } from "./po-format";
+import { DemandTierBadge } from "./demand-tier-badge";
+import { tierForRank } from "@/lib/demand/sku-table";
+import { SlideOverPortal } from "./slide-over-portal";
 
 // Always-real, rule-independent facts about why this PO ranks where it
 // does — combined with the rule-triggered explanation below so the panel
@@ -38,6 +41,7 @@ export function PoDetailPanel({ row, onClose }: { row: PoRow; onClose: () => voi
   const highlights = buildFactualHighlights(row);
 
   return (
+    <SlideOverPortal>
     <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-[2px]" onClick={onClose}>
       <div
         className="animate-fade-in-up h-full w-full max-w-lg overflow-y-auto rounded-l-3xl bg-white p-6 shadow-2xl dark:bg-neutral-900"
@@ -125,6 +129,41 @@ export function PoDetailPanel({ row, onClose }: { row: PoRow; onClose: () => voi
           </ul>
         </div>
 
+        {row.demandHits.length > 0 && (
+          <div className="mt-6">
+            <h3 className="flex items-center gap-1.5 text-sm font-semibold">
+              <TrendingUp size={15} className="text-neutral-400" />
+              Demand contribution
+            </h3>
+            <div className="mt-2 overflow-hidden rounded-xl border border-frido-border dark:border-white/10">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-neutral-50 text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:bg-neutral-800/40">
+                  <tr>
+                    <th className="px-2.5 py-1.5">SKU</th>
+                    <th className="px-2.5 py-1.5 text-right">Rank</th>
+                    <th className="px-2.5 py-1.5 text-right">GMV</th>
+                    <th className="px-2.5 py-1.5">Tier</th>
+                    <th className="px-2.5 py-1.5 text-right">Impact</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-100 dark:divide-white/5">
+                  {row.demandHits.map((hit) => (
+                    <tr key={hit.sku}>
+                      <td className="px-2.5 py-1.5 font-medium">{hit.sku}</td>
+                      <td className="px-2.5 py-1.5 text-right tabular-nums text-neutral-500">#{hit.rank}</td>
+                      <td className="px-2.5 py-1.5 text-right tabular-nums">{formatLakh(hit.gmv)}</td>
+                      <td className="px-2.5 py-1.5">
+                        <DemandTierBadge tier={tierForRank(hit.rank)} />
+                      </td>
+                      <td className="px-2.5 py-1.5 text-right tabular-nums font-semibold">+{hit.points}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         <div className="mt-6">
           <h3 className="flex items-center gap-1.5 text-sm font-semibold">
             <Sparkles size={15} className="text-neutral-400" />
@@ -138,7 +177,7 @@ export function PoDetailPanel({ row, onClose }: { row: PoRow; onClose: () => voi
               <li key={`rule-${i}`}>{line}</li>
             ))}
           </ul>
-          {row.explanation.length === 0 && !row.isOverdue && (
+          {row.explanation.length === 0 && !row.isOverdue && row.demandHits.length === 0 && (
             <p className="mt-2 text-sm text-neutral-500">
               No score-affecting rules matched beyond the facts above — publish more rules in the
               Rules Builder for a fuller picture.
@@ -173,6 +212,7 @@ export function PoDetailPanel({ row, onClose }: { row: PoRow; onClose: () => voi
         </div>
       </div>
     </div>
+    </SlideOverPortal>
   );
 }
 

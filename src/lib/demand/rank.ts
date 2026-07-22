@@ -5,6 +5,7 @@ export interface DemandSkuStats {
   rank: number; // 1 = highest GMV for this marketplace
   gmv: number;
   units: number;
+  product: string; // first-seen product name for this SKU in the sheet (variants can differ slightly across duplicate rows)
 }
 
 // Marketplace -> Master SKU -> that SKU's demand rank/stats within that
@@ -45,15 +46,20 @@ export const HIGH_DEMAND_RANK_THRESHOLD = 15;
 // 56/144 combos on the sample data) are summed before ranking, so a SKU
 // split across multiple rows isn't under-counted against single-row SKUs.
 export function buildDemandIndex(rows: SalesRow[]): DemandIndex {
-  const aggregated = new Map<SupportedMarketplace, Map<string, { gmv: number; units: number }>>();
+  const aggregated = new Map<SupportedMarketplace, Map<string, { gmv: number; units: number; product: string }>>();
 
   for (const row of rows) {
     const marketplace = normalizePlatform(row.platform);
     if (!marketplace) continue; // Amazon Now / BB Now / etc. — out of scope
 
-    const bySku = aggregated.get(marketplace) ?? new Map<string, { gmv: number; units: number }>();
-    const existing = bySku.get(row.masterSku) ?? { gmv: 0, units: 0 };
-    bySku.set(row.masterSku, { gmv: existing.gmv + row.gmv, units: existing.units + row.units });
+    const bySku =
+      aggregated.get(marketplace) ?? new Map<string, { gmv: number; units: number; product: string }>();
+    const existing = bySku.get(row.masterSku);
+    bySku.set(row.masterSku, {
+      gmv: (existing?.gmv ?? 0) + row.gmv,
+      units: (existing?.units ?? 0) + row.units,
+      product: existing?.product || row.product,
+    });
     aggregated.set(marketplace, bySku);
   }
 
@@ -68,7 +74,7 @@ export function buildDemandIndex(rows: SalesRow[]): DemandIndex {
     const ranked = [...bySku.entries()].sort((a, b) => b[1].gmv - a[1].gmv);
     const skuMap = new Map<string, DemandSkuStats>();
     ranked.forEach(([sku, stats], i) => {
-      skuMap.set(sku, { rank: i + 1, gmv: stats.gmv, units: stats.units });
+      skuMap.set(sku, { rank: i + 1, gmv: stats.gmv, units: stats.units, product: stats.product });
     });
     index.set(marketplace, skuMap);
   }

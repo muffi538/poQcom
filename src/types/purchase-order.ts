@@ -1,3 +1,14 @@
+// One SKU line on a PO — kept per-line (not just summed into the PO
+// total) because Demand Intelligence needs to know how much of a
+// specific SKU is pending, not just the PO's overall qty.
+export interface PoLineItem {
+  sku: string;
+  skuDescription: string;
+  orderedQty: number;
+  dispatchedQty: number;
+  pendingQty: number;
+}
+
 // Shape of a normalized Purchase Order row, confirmed against the real
 // Zepto/Blinkit/Instamart sheet tabs. No "supplier" field — confirmed the
 // user's company is the single supplier on every PO, so there's no
@@ -11,6 +22,7 @@ export interface PurchaseOrder {
   sku: string;
   skuDescription: string;
   skus: string[]; // every distinct SKU code on this PO (multi-SKU POs have >1) — the join key for Demand Intelligence
+  lineItems: PoLineItem[]; // one entry per SKU on this PO, with its own qty — needed for per-SKU (not just per-PO) aggregation
 
   poRaisedDate: string; // ISO date
   expiryDate: string; // ISO date

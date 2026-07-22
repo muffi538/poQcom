@@ -6,11 +6,13 @@ import { AwaitingConfig } from "@/components/dashboard/awaiting-config";
 import { PoControlTower } from "@/components/dashboard/po-control-tower";
 import { PoCharts } from "@/components/dashboard/po-charts";
 import { SecondaryPoTable } from "@/components/dashboard/secondary-po-table";
+import { DemandIntelligence } from "@/components/dashboard/demand-intelligence";
 import { MarketplaceThemeScope } from "@/components/theme/marketplace-theme-scope";
 import { fetchPurchaseOrders, SupportedMarketplace } from "@/lib/sheets/marketplaces";
 import { listRules } from "@/lib/rules/storage";
 import { getEngineConfig } from "@/lib/config/store";
 import { getDemandIndex } from "@/lib/demand";
+import { buildTopSkuTable, TopSkuTableResult } from "@/lib/demand/sku-table";
 import { buildExecutiveSummary } from "@/lib/dashboard/summary";
 import { buildPoRows } from "@/lib/dashboard/po-rows";
 import { classifyStatus, isTerminalStatus, isLowValueCantDispatch } from "@/types/purchase-order";
@@ -42,6 +44,7 @@ export default async function MarketplacePage({
   let needsReviewRows: ReturnType<typeof buildPoRows> = [];
   let hasRules = false;
   let demandError: string | null = null;
+  let topSkuData: TopSkuTableResult | null = null;
 
   try {
     const [pos, rules, config, demand] = await Promise.all([
@@ -63,6 +66,7 @@ export default async function MarketplacePage({
     pendingRows = buildPoRows(pendingPos, rules, config, demandIndex);
     expiredRows = buildPoRows(expiredPos, rules, config, demandIndex);
     needsReviewRows = buildPoRows(needsReviewPos, rules, config, demandIndex);
+    topSkuData = buildTopSkuTable(marketplace as SupportedMarketplace, demandIndex, pendingPos);
   } catch (err) {
     errorMessage = err instanceof Error ? err.message : "Failed to load PO data.";
   }
@@ -104,6 +108,7 @@ export default async function MarketplacePage({
               hasRules={hasRules}
               demandError={demandError}
             />
+            {topSkuData && <DemandIntelligence marketplace={marketplace} data={topSkuData} />}
             <details className="glass-card rounded-lg px-3 py-1.5 text-xs">
               <summary className="cursor-pointer select-none font-medium text-neutral-500">
                 Expired POs, Needs Review, and Charts

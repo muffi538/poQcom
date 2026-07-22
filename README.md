@@ -134,22 +134,44 @@ otherwise-identical PO for a slow mover.
   A PO with only a demand contribution (no rule matched) now correctly
   gets a real level via `levelForScore`, instead of falling back to
   "Unscored".
-- **Explanation** — every demand-contributing SKU gets its own line, e.g.
-  `"FR-UCZP-R1 is Zepto's #4 best-selling SKU by GMV (₹6,08,208) — demand
-  priority +25"`, shown in the PO detail panel's "Why this priority"
-  list alongside rule-triggered lines and the always-real factual
-  highlights. A `"High-Demand SKU"` flag is added whenever any SKU on the
-  PO ranks in the top 5.
+- **Explanation** — a compact "Demand contribution" table (SKU / Rank /
+  GMV / Tier / Impact) in the PO detail panel, not prose sentences (the
+  first version wrote a full sentence per matching SKU — "reads like a
+  chatbot, not an analytics dashboard," fair feedback — replaced with the
+  same table/badge language as everywhere else). A `"High-Demand SKU"`
+  flag is added whenever any SKU on the PO ranks in the top
+  `HIGH_DEMAND_RANK_THRESHOLD` (15) — gated there, not "any recorded
+  sales data," because with a catalog as small as Zepto's (~57 SKUs)
+  "rank ≤ 50" would flag nearly every PO and say nothing.
+- **Top Performing SKUs section** (`src/components/dashboard/demand-
+  intelligence.tsx`, `src/lib/demand/sku-table.ts`) — the dashboard
+  section itself, per-marketplace (marketplace page) or tab-switched
+  across Zepto/Blinkit/Instamart (Overview, since ranking is inherently
+  per-marketplace — never one pooled list). KPI strip (Top 10 GMV Share,
+  Top SKU GMV, Average GMV, Open POs containing a top-20 SKU), Top 10 /
+  Top 20 / All(50) / In-Pending-POs-Only filters, a compact ranked table
+  (Rank/SKU/Product/GMV/Units/Tier badge/Priority Impact/Pending-PO
+  status), rows highlighted when the SKU sits in an open Pending PO, and
+  a click-through side panel (Product Name, SKU, Marketplace Rank, GMV,
+  Units Sold, Pending PO count, cities waiting, total pending qty,
+  priority contribution). No emoji anywhere — tier badges (Very High/
+  High/Medium/Low) use the same dot+label convention as Priority/Status
+  badges elsewhere.
 - **Validated against the real sheets** — spot-checked Zepto PO
   `P4915194` (5 SKUs, 4 matched: ranks #2/#4/#5/#11 → score 90 from
-  demand + 10 metro bonus = 100, Critical) and cross-checked Blinkit's
-  full GMV ranking independently; both matched the engine's output
-  exactly.
-- **Not yet built** (confirmed fast-follow, not simultaneous): the
-  "Demand Intelligence" dashboard section itself — Top Selling SKUs, Top
-  20 GMV, Fastest Moving, high-demand-low-pending-qty, SKUs in urgent
-  POs, marketplace demand trends. The scoring integration above is live;
-  this is a separate visualization layer on top of it.
+  demand + 10 metro bonus = 100, Critical) and independently
+  cross-checked both Zepto's and Blinkit's full GMV rankings with a
+  from-scratch script; both matched the engine's and the new table's
+  output exactly.
+- **Found while building this**: the root layout wraps the whole app in
+  an `animate-fade-in-up` div (`src/app/layout.tsx`) — any CSS transform
+  on an ancestor becomes the containing block for `position: fixed`
+  descendants, so a slide-over panel opened after scrolling down a long
+  page (like this new section makes marketplace pages) pinned to the
+  *page's* scroll position instead of the viewport. Invisible on the
+  shorter pages that existed before this section; fixed by rendering
+  both slide-over panels through a `document.body` portal
+  (`slide-over-portal.tsx`) so they always anchor to the real viewport.
 
 ## Design system
 

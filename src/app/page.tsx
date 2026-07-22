@@ -19,11 +19,13 @@ import { AwaitingConfig } from "@/components/dashboard/awaiting-config";
 import { PoControlTower } from "@/components/dashboard/po-control-tower";
 import { PoCharts } from "@/components/dashboard/po-charts";
 import { SecondaryPoTable } from "@/components/dashboard/secondary-po-table";
+import { DemandIntelligenceTabs } from "@/components/dashboard/demand-intelligence-tabs";
 import { MarketplaceThemeScope } from "@/components/theme/marketplace-theme-scope";
-import { fetchAllPurchaseOrders } from "@/lib/sheets/marketplaces";
+import { fetchAllPurchaseOrders, SUPPORTED_MARKETPLACES, SupportedMarketplace } from "@/lib/sheets/marketplaces";
 import { listRules } from "@/lib/rules/storage";
 import { getEngineConfig } from "@/lib/config/store";
 import { getDemandIndex } from "@/lib/demand";
+import { buildTopSkuTable, TopSkuTableResult } from "@/lib/demand/sku-table";
 import { buildExecutiveSummary } from "@/lib/dashboard/summary";
 import { buildPoRows } from "@/lib/dashboard/po-rows";
 import { classifyStatus, isTerminalStatus, isLowValueCantDispatch } from "@/types/purchase-order";
@@ -50,6 +52,7 @@ export default async function OverviewPage() {
   let needsReviewRows: ReturnType<typeof buildPoRows> = [];
   let hasRules = false;
   let demandError: string | null = null;
+  let topSkuByMarketplace: Record<string, TopSkuTableResult> = {};
 
   try {
     const [pos, rules, config, demand] = await Promise.all([
@@ -77,6 +80,9 @@ export default async function OverviewPage() {
     pendingRows = buildPoRows(pendingPos, rules, config, demandIndex);
     expiredRows = buildPoRows(expiredPos, rules, config, demandIndex);
     needsReviewRows = buildPoRows(needsReviewPos, rules, config, demandIndex);
+    topSkuByMarketplace = Object.fromEntries(
+      SUPPORTED_MARKETPLACES.map((m: SupportedMarketplace) => [m, buildTopSkuTable(m, demandIndex, pendingPos)])
+    );
   } catch (err) {
     errorMessage = err instanceof Error ? err.message : "Failed to load PO data.";
   }
@@ -123,6 +129,7 @@ export default async function OverviewPage() {
               hasRules={hasRules}
               demandError={demandError}
             />
+            <DemandIntelligenceTabs marketplaces={[...MARKETPLACES]} data={topSkuByMarketplace} />
             <details className="glass-card rounded-lg px-3 py-1.5 text-xs">
               <summary className="cursor-pointer select-none font-medium text-neutral-500">
                 Expired POs, Needs Review, and Charts

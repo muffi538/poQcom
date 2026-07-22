@@ -9,10 +9,6 @@ import { computeDemandContribution } from "@/lib/demand/score-po";
 
 const EMPTY_DEMAND_INDEX: DemandIndex = new Map();
 
-function formatGmv(gmv: number): string {
-  return `₹${Math.round(gmv).toLocaleString("en-IN")}`;
-}
-
 // The one place PO + Rules + Config + Demand Intelligence come together
 // into a final priority result. Level is score-derived only (confirmed)
 // — computed here from the combined accumulated score via
@@ -41,11 +37,10 @@ export function computePoPriority(
   const totalScore = result.score + demand.score;
   const hasSignal = result.appliedRuleIds.length > 0 || demand.hits.length > 0;
 
+  // Demand hits are returned structurally (demandHits below), not as
+  // prose — the UI renders them as a compact table (see po-detail-panel
+  // and the Top Performing SKUs section), not a wall of sentences.
   const sortedHits = demand.hits.slice().sort((a, b) => a.rank - b.rank);
-  const demandExplanation = sortedHits.map(
-    (hit) =>
-      `${hit.sku} is ${po.marketplace}'s #${hit.rank} best-selling SKU by GMV (${formatGmv(hit.gmv)}) — demand priority +${hit.points}`
-  );
 
   return {
     poId: po.id,
@@ -57,7 +52,7 @@ export function computePoPriority(
       ? [...result.flags, "High-Demand SKU"]
       : result.flags,
     confidence: result.confidence,
-    explanation: [...result.explanation, ...demandExplanation],
+    explanation: result.explanation,
     recommendedActions: result.recommendedActions,
     demandHits: sortedHits,
   };

@@ -1,6 +1,6 @@
 import { readSheetTab } from "./client";
 import { loadSkuCostPriceMap } from "./price-master";
-import { PurchaseOrder } from "@/types/purchase-order";
+import { PurchaseOrder, PoLineItem } from "@/types/purchase-order";
 import { parseSheetDate } from "@/lib/po/dates";
 import {
   cityFromZeptoLocation,
@@ -161,6 +161,28 @@ function aggregateLineItems(
     }
     if (!hasKnownPrice) poValue = null;
 
+    // Per-SKU line items (distinct from the group above — a PO can list
+    // the same SKU on more than one row) needed for Demand Intelligence's
+    // per-SKU pending qty, not just this PO's total.
+    const lineItemsBySku = new Map<string, PoLineItem>();
+    for (const line of group) {
+      if (!line.sku) continue;
+      const existing = lineItemsBySku.get(line.sku);
+      if (existing) {
+        existing.orderedQty += line.orderedQty;
+        existing.dispatchedQty += line.dispatchedQty;
+        existing.pendingQty = Math.max(0, existing.orderedQty - existing.dispatchedQty);
+      } else {
+        lineItemsBySku.set(line.sku, {
+          sku: line.sku,
+          skuDescription: line.skuDescription,
+          orderedQty: line.orderedQty,
+          dispatchedQty: line.dispatchedQty,
+          pendingQty: Math.max(0, line.orderedQty - line.dispatchedQty),
+        });
+      }
+    }
+
     purchaseOrders.push({
       id: poNo,
       marketplace,
@@ -170,6 +192,7 @@ function aggregateLineItems(
       skuDescription:
         group.length > 1 ? `${first.skuDescription} +${group.length - 1} more` : first.skuDescription,
       skus: [...new Set(group.map((line) => line.sku).filter(Boolean))],
+      lineItems: [...lineItemsBySku.values()],
       poRaisedDate: first.poRaisedDate ?? "",
       expiryDate: first.expiryDate ?? "",
       appointmentDate: first.appointmentDate,
