@@ -75,7 +75,7 @@ export default async function MarketplacePage({
 
   return (
     <MarketplaceThemeScope marketplace={marketplace}>
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         <h1 className="flex items-center gap-2 text-base font-semibold tracking-tight text-neutral-500">
           <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: theme.primary }} />
           {marketplace}
