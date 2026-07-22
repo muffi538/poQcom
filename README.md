@@ -511,6 +511,45 @@ did). Also re-confirmed against a synthetic mid-block-anchor scenario:
 Status/City/Location/dates all resolve correctly no matter where in the
 block the real values sit.
 
+**Third bug, found from a real Flipkart Minutes screenshot** (PO
+`FBPWN07536855`: sheet said Delivered, dashboard showed Pending +
+Expired + 141 days late): this was never a Status *parsing* bug — the
+priority engine ran on every PO regardless of status (see "Priority
+Engine Rules" below); the actual parsing logic already handled this
+exact shape correctly. While rebuilding the grouping logic to match an
+explicit "PO-by-PO, anchor row + inherit, never overwrite" mental model
+(clearer to reason about than the previous scan-based description, even
+though behaviorally almost identical for well-formed data), a real
+regression surfaced against the live Zepto sheet: switching to
+strictly-contiguous PO blocks (a row starts a new PO, rows after it
+belong to that PO until a different PO Number appears) silently split
+one real PO into two whenever the same PO Number legitimately
+reappeared non-contiguously in the sheet (e.g. a SKU added to an
+existing PO further down the file) — Zepto's parsed count moved from
+374 to 375 POs. Fixed by keeping PO-Number-keyed grouping (a `Map`, not
+row-adjacency) so every row sharing a PO Number merges into one PO no
+matter where it sits in the file, while still resolving each PO-level
+field via `firstNonBlank` (first non-blank value found across the whole
+group, in row order) rather than trusting the group's first row
+specifically. A synthetic test now covers this exact case (a PO's rows
+split by an unrelated PO in between) as a permanent regression guard.
+
+Also added while investigating: an expanded status vocabulary
+(`Dispatch Scheduled`, `Rejected`, alongside the existing Pending/
+Delivered/Dispatched/Cancelled/Closed/Completed/Scheduled), a business
+rule that Delivered/Dispatched POs are fully out the door regardless of
+what the sheet's own dispatched-qty tracking says (`Dispatched Qty =
+Ordered Qty`, `Pending Qty = 0` — several sheets don't track dispatched
+quantity at all, so without this a Delivered PO would still show 100%
+pending), and a generic (every marketplace, not just Flipkart Minutes)
+validation pass that runs on every import and logs a distinct
+`[VALIDATION FAIL]` error the moment a PO's resolved Status/quantities
+disagree with what its own sheet row says — the exact check that would
+have caught this bug the moment it happened, rather than relying on
+someone noticing it in the UI. The Flipkart Minutes debug log now also
+prints `Inherited From Parent: Yes/No` per PO (whether the value had to
+be found on a row other than the group's first).
+
 Still open: confirming Flipkart Minutes' own brand color (currently
 reusing Flipkart's own blue, `#2874F0`/`#4FA3FF`, as a placeholder), and
 setting `GOOGLE_SHEET_GID_FLIPKART_MINUTES` (plus `FLIPKART_MINUTES_

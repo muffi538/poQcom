@@ -136,33 +136,6 @@ function detectHeaderRow(
   return { headerRowIndex: bestIndex, header };
 }
 
-// Each PO's SKU line items are only entered with a PO Number on the
-// sheet's own terms — some sheets blank it out on continuation rows
-// (Zepto/Blinkit/Instamart), so this fills it forward before grouping;
-// without this, continuation lines would have no PO Number to group by
-// and get silently dropped (aggregateLineItems skips poNo-less lines).
-//
-// This ONLY forward-fills the grouping key, deliberately not the other
-// PO-level fields (Status, dates, City, Location, ...) anymore — a
-// previous version forward-filled those too, assuming the row carrying
-// their real values was always the group's FIRST row. That's true for
-// Zepto/Blinkit/Instamart, but not guaranteed in general: a merged cell
-// can visually/structurally anchor its value to ANY row in the block
-// (seen on Flipkart Minutes — Status was only genuinely populated on one
-// row in the middle of a multi-line PO, so forward-fill alone could
-// never backfill the earlier rows, which come before it in the file).
-// aggregateLineItems now resolves each PO-level field by scanning the
-// WHOLE group for the first non-blank value instead, which is correct
-// regardless of which row happens to carry the real data.
-function forwardFillPoNumber(rows: Record<string, string>[], poNoColumn: string): Record<string, string>[] {
-  let last = "";
-  return rows.map((row) => {
-    const raw = row[poNoColumn]?.trim();
-    if (raw) last = raw;
-    return { ...row, [poNoColumn]: raw || last };
-  });
-}
-
 interface LineItem {
   poNo: string;
   city: string;
@@ -265,29 +238,23 @@ function toLineItem(
 // — not necessarily the first (confirmed on Flipkart Minutes: Status was
 // only genuinely populated on one row in the middle of a multi-line PO) —
 // so this must be position-independent to be correct for every sheet.
-function firstNonBlank<T extends string | null>(group: LineItem[], select: (line: LineItem) => T): T {
-  for (const line of group) {
-    const value = select(line);
-    if (value !== null && value !== "") return value;
-  }
-  return select(group[0]);
-}
-
 // Canonical status vocabulary (confirmed mapping) — matched
 // case-insensitively and trimmed, so "delivered", "Delivered ", and
 // "DELIVERED" all resolve the same way. Any other non-blank text is
 // preserved as-is rather than discarded ("any additional valid status
 // should be preserved") — this is a normalizer, not a filter. A
-// genuinely blank/undeterminable status (every row in the PO's group had
-// an empty Status cell) is never silently treated as Pending — it
-// becomes "Unknown", logged as a warning, so a real parsing gap stays
-// visible instead of quietly mis-prioritizing the PO.
+// genuinely blank/undeterminable status (the PO's anchor row had an
+// empty Status cell) is never silently treated as Pending — it becomes
+// "Unknown", logged as a warning, so a real parsing gap stays visible
+// instead of quietly mis-prioritizing the PO.
 const STATUS_ALIASES: Record<string, string> = {
   pending: "Pending",
   delivered: "Delivered",
   dispatched: "Dispatched",
+  "dispatch scheduled": "Dispatch Scheduled",
   cancelled: "Cancelled",
   cancel: "Cancelled",
+  rejected: "Rejected",
   closed: "Closed",
   completed: "Completed",
   scheduled: "Scheduled",
@@ -297,32 +264,81 @@ function normalizeStatus(raw: string, poNo: string, marketplace: SupportedMarket
   const trimmed = raw.trim();
   if (!trimmed) {
     console.warn(
-      `[${marketplace}] PO ${poNo}: no Status value found in any of its rows — set to "Unknown" (not defaulted to Pending).`
+      `[${marketplace}] PO ${poNo}: anchor row's Status cell was blank — set to "Unknown" (not defaulted to Pending).`
     );
     return "Unknown";
   }
   return STATUS_ALIASES[trimmed.toLowerCase()] ?? trimmed;
 }
 
-// Groups SKU line items back up into one row per PO Number (confirmed
-// approach, matching the BigBasket PO-level-aggregation decision), summing
-// quantities/value across lines and keeping the shared PO-level fields.
+// One PO's worth of rows, grouped by PO Number *wherever it appears in
+// the sheet* — not assumed to be contiguous. Confirmed necessary: the
+// same PO Number can legitimately appear in more than one place (e.g. a
+// SKU added to an existing PO later in the file); treating each
+// occurrence as a separate block would silently split one PO's
+// quantity across two dashboard rows, which is worse than the bug this
+// is meant to fix. A row with a blank PO Number continues whichever PO
+// most recently had a non-blank one (forward-fill), so continuation
+// lines still land in the right group even though they carry no PO
+// Number of their own.
+interface PoBlock {
+  poNo: string;
+  lines: LineItem[];
+}
+
+function groupIntoPoBlocks(lines: LineItem[]): PoBlock[] {
+  const byPoNo = new Map<string, PoBlock>();
+  const order: PoBlock[] = [];
+  let lastPoNo = "";
+
+  for (const line of lines) {
+    const poNo = line.poNo.trim() || lastPoNo;
+    if (!poNo) continue; // no PO Number seen yet at all (blank leading rows) — nothing to attach to
+    lastPoNo = poNo;
+
+    let block = byPoNo.get(poNo);
+    if (!block) {
+      block = { poNo, lines: [] };
+      byPoNo.set(poNo, block);
+      order.push(block);
+    }
+    block.lines.push(line);
+  }
+  return order;
+}
+
+// Picks the first non-blank value for a PO-level field across an entire
+// PO block, rather than trusting its first row. The row carrying the
+// PO Number is normally where these live (every other row in the group
+// blanks them out via a merged cell), but that is not assumed to
+// specifically be the group's first row — a real value found anywhere
+// in the group is used rather than lost, which matters if a merged
+// cell's anchor ever sits mid-block instead of at the top.
+function firstNonBlank<T extends string | null>(group: LineItem[], select: (line: LineItem) => T): T {
+  for (const line of group) {
+    const value = select(line);
+    if (value !== null && value !== "") return value;
+  }
+  return select(group[0]);
+}
+
+// Turns each PO block into a PurchaseOrder — summing quantities/value
+// across its lines, applying the confirmed business rule that Delivered
+// and Dispatched POs are fully out the door (Dispatched Qty = Ordered
+// Qty, Pending Qty = 0) regardless of what the sheet's own dispatched-qty
+// column says (several sheets don't track it at all, so this is the only
+// way those POs stop showing 100% pending after they're actually gone).
 function aggregateLineItems(
   lines: LineItem[],
   marketplace: SupportedMarketplace,
   priceMap: Map<string, number>
 ): PurchaseOrder[] {
-  const byPoNo = new Map<string, LineItem[]>();
-  for (const line of lines) {
-    if (!line.poNo) continue; // no PO No at all (blank leading rows) — nothing to attach to
-    const group = byPoNo.get(line.poNo) ?? [];
-    group.push(line);
-    byPoNo.set(line.poNo, group);
-  }
+  const blocks = groupIntoPoBlocks(lines);
 
   const purchaseOrders: PurchaseOrder[] = [];
-  for (const [poNo, group] of byPoNo) {
-    const first = group[0];
+  for (const block of blocks) {
+    const { poNo } = block;
+    const group = block.lines;
     const city = firstNonBlank(group, (l) => l.city);
     const warehouse = firstNonBlank(group, (l) => l.warehouse);
     const rawStatus = firstNonBlank(group, (l) => l.status);
@@ -331,6 +347,7 @@ function aggregateLineItems(
     const expiryDate = firstNonBlank(group, (l) => l.expiryDate);
     const appointmentDate = firstNonBlank(group, (l) => l.appointmentDate);
     const dispatchDate = firstNonBlank(group, (l) => l.dispatchDate);
+    const first = group[0];
     let orderedQty = 0;
     let dispatchedQty = 0;
     let poValue: number | null = 0;
@@ -347,24 +364,31 @@ function aggregateLineItems(
     }
     if (!hasKnownPrice) poValue = null;
 
+    // Fully out the door once Delivered/Dispatched — overrides whatever
+    // the sheet's own (often untracked) dispatched-qty column summed to.
+    if (isDeliveredStatus(status) || isDispatchedStatus(status)) {
+      dispatchedQty = orderedQty;
+    }
+
     // Per-SKU line items (distinct from the group above — a PO can list
     // the same SKU on more than one row) needed for Demand Intelligence's
     // per-SKU pending qty, not just this PO's total.
     const lineItemsBySku = new Map<string, PoLineItem>();
     for (const line of group) {
       if (!line.sku) continue;
+      const lineDispatchedQty = isDeliveredStatus(status) || isDispatchedStatus(status) ? line.orderedQty : line.dispatchedQty;
       const existing = lineItemsBySku.get(line.sku);
       if (existing) {
         existing.orderedQty += line.orderedQty;
-        existing.dispatchedQty += line.dispatchedQty;
+        existing.dispatchedQty += lineDispatchedQty;
         existing.pendingQty = Math.max(0, existing.orderedQty - existing.dispatchedQty);
       } else {
         lineItemsBySku.set(line.sku, {
           sku: line.sku,
           skuDescription: line.skuDescription,
           orderedQty: line.orderedQty,
-          dispatchedQty: line.dispatchedQty,
-          pendingQty: Math.max(0, line.orderedQty - line.dispatchedQty),
+          dispatchedQty: lineDispatchedQty,
+          pendingQty: Math.max(0, line.orderedQty - lineDispatchedQty),
         });
       }
     }
@@ -435,8 +459,11 @@ export async function fetchPurchaseOrders(
     rawRows = await readSheetTab(gid, config.headerRowIndex, sheetId);
   }
 
-  const filledRows = forwardFillPoNumber(rawRows, config.poNoColumn);
-  const lines = filledRows.map((row) => toLineItem(row, marketplace));
+  // Each row keeps its own (possibly blank) PO Number here — anchor
+  // detection in groupIntoPoBlocks needs to see genuinely blank
+  // continuation rows, not a pre-filled value indistinguishable from a
+  // row that legitimately repeats its own PO Number.
+  const lines = rawRows.map((row) => toLineItem(row, marketplace));
   // Returns every PO regardless of status — Executive Summary decides
   // which statuses count as "active" per metric (see buildExecutiveSummary).
   let purchaseOrders = aggregateLineItems(lines, marketplace, resolvedPriceMap);
@@ -477,20 +504,33 @@ export async function fetchPurchaseOrders(
       }.`
   );
 
+  // Validation engine (generic — every marketplace, not just Flipkart
+  // Minutes): re-derives what the sheet's own anchor row said and
+  // compares it against what actually made it onto the dashboard,
+  // logging a loud, distinct error the moment they disagree. This is
+  // the one check that would have caught the exact bug reported
+  // ("Sheet: Delivered, Dashboard: Pending") the moment it happened,
+  // rather than relying on a human noticing it in the UI.
+  validatePurchaseOrders(purchaseOrders, marketplace);
+
   // Debug mode (Flipkart Minutes only, per confirmed ask): one line per
   // PO showing exactly what the parser read (raw Status straight off the
-  // sheet, before normalizeStatus) vs. what it resolved to, plus whether
-  // the priority engine will actually score it — "Priority Eligible"
-  // mirrors computePoPriority's own gate (isPendingStatus) exactly, so
-  // this log is a true preview of what the engine will do, not a
-  // separate guess. Left in as a standing diagnostic, not removed after
-  // this session — the cheapest way to catch a status mismatch against
-  // the real sheet without re-deriving it by hand.
+  // sheet's anchor row, before normalizeStatus) vs. what it resolved to,
+  // whether any field had to be inherited from that anchor by a
+  // continuation row, and whether the priority engine will actually
+  // score it — "Priority Eligible" mirrors computePoPriority's own gate
+  // (isPendingStatus) exactly, so this log is a true preview of what the
+  // engine will do, not a separate guess. Left in as a standing
+  // diagnostic, not removed after this session — the cheapest way to
+  // catch a status mismatch against the real sheet without re-deriving
+  // it by hand.
   if (marketplace === "Flipkart Minutes") {
     let missingExpiry = 0;
     let missingPoRaised = 0;
     for (const po of purchaseOrders) {
+      const groupLines = (po.raw.lineItems as LineItem[]) ?? [];
       const rawStatus = typeof po.raw.rawStatus === "string" ? po.raw.rawStatus : "";
+      const inheritedFromParent = (groupLines[0]?.status.trim() ?? "") === "" && rawStatus.trim() !== "";
       const eligible = isPendingStatus(po.status);
       const reason = eligible
         ? "Pending — eligible for prioritisation"
@@ -506,7 +546,8 @@ export async function fetchPurchaseOrders(
                   ? "Status could not be determined from the sheet"
                   : "Non-Pending status — Needs Review, not prioritised";
       console.log(
-        `[Flipkart Minutes][debug] PO: ${po.id} | Raw Status: "${rawStatus}" | Parsed Status: "${po.status}" | ` +
+        `[Flipkart Minutes][debug] PO: ${po.id} | Raw Sheet Status: "${rawStatus}" | Normalized Status: "${po.status}" | ` +
+          `Dashboard Status: "${po.status}" | Inherited From Parent: ${inheritedFromParent ? "Yes" : "No"} | ` +
           `Priority Eligible: ${eligible ? "Yes" : "No"} | Reason: ${reason}`
       );
       if (!po.expiryDate) missingExpiry++;
@@ -520,6 +561,35 @@ export async function fetchPurchaseOrders(
   }
 
   return purchaseOrders;
+}
+
+// Compares each PO's sheet-anchor Status/quantities against what the
+// dashboard ended up showing, logging a distinct [VALIDATION FAIL] error
+// for any disagreement — generic across every marketplace, run on every
+// import, not a one-off check for whichever marketplace is misbehaving
+// this week.
+function validatePurchaseOrders(purchaseOrders: PurchaseOrder[], marketplace: SupportedMarketplace): void {
+  for (const po of purchaseOrders) {
+    const groupLines = (po.raw.lineItems as LineItem[]) ?? [];
+    const anchorRawStatus = groupLines[0]?.status?.trim() ?? "";
+    const anchorNormalized = anchorRawStatus ? STATUS_ALIASES[anchorRawStatus.toLowerCase()] ?? anchorRawStatus : "";
+
+    if (anchorRawStatus && anchorNormalized !== po.status) {
+      console.error(
+        `[${marketplace}][VALIDATION FAIL] PO ${po.id}: Sheet Status = "${anchorRawStatus}", Dashboard Status = "${po.status}".`
+      );
+    }
+    if ((isDeliveredStatus(po.status) || isDispatchedStatus(po.status)) && po.pendingQty > 0) {
+      console.error(
+        `[${marketplace}][VALIDATION FAIL] PO ${po.id}: Status = "${po.status}" but Pending Qty = ${po.pendingQty} (expected 0).`
+      );
+    }
+    if (isDeliveredStatus(po.status) && po.dispatchedQty !== po.orderedQty) {
+      console.error(
+        `[${marketplace}][VALIDATION FAIL] PO ${po.id}: Status = "Delivered" but Dispatched Qty (${po.dispatchedQty}) != Ordered Qty (${po.orderedQty}).`
+      );
+    }
+  }
 }
 
 // One unconfigured or not-yet-connected marketplace (e.g. Flipkart
