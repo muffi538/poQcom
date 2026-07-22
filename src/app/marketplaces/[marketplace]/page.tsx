@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { Package, Boxes, Truck, Clock, AlertTriangle, ShieldAlert } from "lucide-react";
-import { MARKETPLACES } from "@/types/marketplace";
+import { MARKETPLACES, marketplaceSlug } from "@/types/marketplace";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { AwaitingConfig } from "@/components/dashboard/awaiting-config";
 import { PoControlTower } from "@/components/dashboard/po-control-tower";
@@ -19,7 +19,7 @@ import { classifyStatus, isTerminalStatus, isLowValueCantDispatch } from "@/type
 import { themeFor } from "@/lib/theme/marketplace-colors";
 
 export function generateStaticParams() {
-  return MARKETPLACES.map((m) => ({ marketplace: m.toLowerCase() }));
+  return MARKETPLACES.map((m) => ({ marketplace: marketplaceSlug(m) }));
 }
 
 function fmtDays(n: number | null): string {
@@ -33,7 +33,7 @@ export default async function MarketplacePage({
 }) {
   const { marketplace: marketplaceParam } = await params;
   const marketplace = MARKETPLACES.find(
-    (m) => m.toLowerCase() === marketplaceParam.toLowerCase()
+    (m) => marketplaceSlug(m) === marketplaceParam.toLowerCase()
   );
   if (!marketplace) notFound();
 

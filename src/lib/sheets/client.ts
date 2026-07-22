@@ -19,8 +19,14 @@ export function getConfiguredSheetId(): string | null {
 // the header row(s). Use this instead of readSheetTab when a tab has
 // duplicate column names in different blocks — object-keyed rows would
 // silently collapse those to whichever column came last.
-export async function readSheetTabRaw(gid: string): Promise<string[][]> {
-  const sheetId = getConfiguredSheetId();
+//
+// `sheetIdOverride` lets a marketplace point at its own separate workbook
+// instead of the shared GOOGLE_SHEET_URL (confirmed future-proofing: not
+// every marketplace's data has to live in one workbook) — pass an env var
+// value already resolved by the caller, not a marketplace name, so this
+// stays generic.
+export async function readSheetTabRaw(gid: string, sheetIdOverride?: string): Promise<string[][]> {
+  const sheetId = sheetIdOverride ?? getConfiguredSheetId();
   if (!sheetId) {
     throw new Error(
       "Google Sheets is not configured yet. Set GOOGLE_SHEET_URL (or GOOGLE_SHEET_ID) in .env — see Settings."
@@ -45,9 +51,10 @@ export async function readSheetTabRaw(gid: string): Promise<string[][]> {
 // this for tabs with duplicate header names — see readSheetTabRaw.
 export async function readSheetTab(
   gid: string,
-  headerRowIndex = 0
+  headerRowIndex = 0,
+  sheetIdOverride?: string
 ): Promise<Record<string, string>[]> {
-  const rows = await readSheetTabRaw(gid);
+  const rows = await readSheetTabRaw(gid, sheetIdOverride);
   const header = rows[headerRowIndex];
   if (!header) return [];
 

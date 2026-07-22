@@ -1,14 +1,8 @@
 import { CheckCircle2, AlertTriangle } from "lucide-react";
 import { getConfiguredSheetId } from "@/lib/sheets/client";
 import { getEngineConfig } from "@/lib/config/store";
-import { SUPPORTED_MARKETPLACES } from "@/lib/sheets/marketplaces";
+import { SUPPORTED_MARKETPLACES, TAB_CONFIG } from "@/lib/sheets/marketplaces";
 import { MarketplaceThemeScope } from "@/components/theme/marketplace-theme-scope";
-
-const GID_ENV_KEYS: Record<string, string> = {
-  Zepto: "GOOGLE_SHEET_GID_ZEPTO",
-  Blinkit: "GOOGLE_SHEET_GID_BLINKIT",
-  Instamart: "GOOGLE_SHEET_GID_INSTAMART",
-};
 
 export default async function SettingsPage() {
   const sheetId = getConfiguredSheetId();
@@ -46,15 +40,21 @@ export default async function SettingsPage() {
 
           <ul className="mt-4 space-y-1.5 text-sm text-neutral-600 dark:text-neutral-400">
             {SUPPORTED_MARKETPLACES.map((m) => {
-              const configured = Boolean(process.env[GID_ENV_KEYS[m]]);
+              const tab = TAB_CONFIG[m];
+              const gidConfigured = Boolean(process.env[tab.gidEnvKey]);
+              const sheetConfigured = tab.sheetUrlEnvKey ? Boolean(process.env[tab.sheetUrlEnvKey]) : true;
+              const columnsMapped = tab.poNoColumn !== null;
+              const ok = gidConfigured && sheetConfigured && columnsMapped;
+              let detail = `${tab.gidEnvKey}${tab.sheetUrlEnvKey ? `, ${tab.sheetUrlEnvKey}` : ""}`;
+              if (!columnsMapped) detail = "column layout not yet mapped — see TAB_CONFIG";
               return (
                 <li key={m} className="flex items-center gap-1.5">
-                  {configured ? (
+                  {ok ? (
                     <CheckCircle2 size={13} className="text-[#0ca30c]" />
                   ) : (
                     <AlertTriangle size={13} className="text-[#fab219]" />
                   )}
-                  {m}: tab {configured ? "configured" : "missing"} ({GID_ENV_KEYS[m]})
+                  {m}: tab {ok ? "configured" : "missing"} ({detail})
                 </li>
               );
             })}

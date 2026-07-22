@@ -241,6 +241,71 @@ pricing tab, plus `SALES_SHEET_URL` for the separate Demand Intelligence
 sales workbook. `/settings` shows connection status read-only; nothing to
 paste there today.
 
+## Adding a marketplace (Flipkart Minutes)
+
+Flipkart Minutes is registered as a 4th marketplace — same status
+routing, same priority engine, same dashboard, same Demand Intelligence
+scoring as Zepto/Blinkit/Instamart, with no marketplace-specific code
+anywhere in the shared logic. It shows up in the sidebar, Overview,
+marketplace filters, and Settings today, in a graceful "awaiting
+configuration" state, the same way any marketplace missing its gid
+already behaved.
+
+What's generic and done:
+- `MARKETPLACES` (`src/types/marketplace.ts`) and `SUPPORTED_MARKETPLACES`
+  (`src/lib/sheets/marketplaces.ts`) both include it — everything that
+  reads those two constants (sidebar nav, Overview KPIs/table, per-
+  marketplace filters, Demand Intelligence tabs, Settings, the field
+  catalog's marketplace enum) picked it up with no further code change.
+- `TAB_CONFIG["Flipkart Minutes"]` reads its gid from
+  `GOOGLE_SHEET_GID_FLIPKART_MINUTES` and — new, generic capability, not
+  Flipkart-specific — optionally a **separate workbook** via
+  `FLIPKART_MINUTES_SHEET_URL` (confirmed: don't assume every
+  marketplace's data lives in the one shared sheet).
+- A configurable **PO-Raised-Year floor** (`minPoRaisedYear`, set to 2026
+  for Flipkart Minutes) filters on PO Raised Date, never Expiry Date, and
+  logs + skips (never crashes on) any row with an unparseable date. This
+  is a per-marketplace config value, not an `if (marketplace ===
+  "Flipkart Minutes")` check, so any marketplace can opt into it.
+- All statuses are already imported for every marketplace (confirmed
+  pre-existing behavior, not new) — only `classifyStatus` routes
+  `Pending` into the priority engine; anything else (including statuses
+  this sheet hasn't shown before) falls into "Needs Review" rather than
+  failing, so unknown Flipkart Minutes statuses are handled without code
+  changes.
+- Fixed two latent bugs this surfaced: `toLineItem`'s per-marketplace
+  dispatch was an if/else-fallthrough that would have silently parsed a
+  4th marketplace as if it were Instamart (now an exhaustive switch that
+  throws for anything unmapped); and the sidebar/route slug was a bare
+  `.toLowerCase()`, which breaks for a two-word name like "Flipkart
+  Minutes" (now a proper `marketplaceSlug()` helper — its URL is
+  `/marketplaces/flipkart-minutes`).
+- `fetchAllPurchaseOrders` (used by Overview) now fetches every
+  marketplace independently (`Promise.allSettled`, not `Promise.all`) —
+  one unconfigured marketplace no longer takes the whole Overview page
+  down for the ones that do work.
+
+What's still open — **needs the real sheet, not guessed**, same as every
+other tab/workbook connected in this project:
+- Column layout (`poNoColumn`, `poLevelColumns`, `headerRowIndex` in
+  `TAB_CONFIG`) and its own `toLineItem` case — PO Number/City-or-FC/SKU/
+  date column names, whether it tracks Dispatched Qty separately, header
+  row offset. `fetchPurchaseOrders("Flipkart Minutes")` throws a clear
+  "not yet mapped" error rather than guessing (visible today as the
+  Awaiting Config message on its marketplace page).
+- A city-derivation function for its FC-name or location format (see
+  `src/lib/po/city.ts`'s three existing per-marketplace parsers).
+- Confirming its brand color (currently reusing Flipkart's own blue,
+  `#2874F0`/`#4FA3FF`, as a placeholder).
+
+Also flagged, not yet built (bigger, and applies to **all** marketplaces
+once scoped, not a Flipkart-specific ask): Top Cities / Top FCs / Top
+SKUs dashboard widgets, a Year/Status/Expiry-Window/Top-SKU filter set,
+and a dedicated Reports section — none of these exist for Zepto/Blinkit/
+Instamart today either, so building them once the sheet is connected (and
+real data can validate them) is a separate, explicitly scoped follow-up
+rather than something silently dropped.
+
 ## Confirmed but not yet implemented
 
 - **Interactive Rules Builder** — Create/Edit/Import/Export/drag-reorder

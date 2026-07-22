@@ -10,6 +10,10 @@ export const MARKETPLACE_THEMES: Record<string, MarketplaceTheme> = {
   Zepto: { primary: "#7E22CE", accent: "#A855F7" },
   Blinkit: { primary: "#FFD400", accent: "#111111" },
   Instamart: { primary: "#FF6B35", accent: "#FF8A65" },
+  // Reuses Flipkart's own blue (same parent brand) as a reasonable
+  // placeholder — flag if Flipkart Minutes has its own distinct branding
+  // to swap in instead.
+  "Flipkart Minutes": { primary: "#2874F0", accent: "#4FA3FF" },
   Flipkart: { primary: "#2874F0", accent: "#4FA3FF" },
   Myntra: { primary: "#FF3F6C", accent: "#FF7096" },
   Amazon: { primary: "#FF9900", accent: "#232F3E" },

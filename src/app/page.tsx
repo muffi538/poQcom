@@ -91,7 +91,7 @@ export default async function OverviewPage() {
     <MarketplaceThemeScope marketplace={null}>
       <div className="space-y-2">
         <h1 className="text-base font-semibold tracking-tight text-neutral-500">
-          Overview <span className="font-normal text-neutral-400">— Zepto, Blinkit, Instamart</span>
+          Overview <span className="font-normal text-neutral-400">— {MARKETPLACES.join(", ")}</span>
         </h1>
 
         {errorMessage ? (

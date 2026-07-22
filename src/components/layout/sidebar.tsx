@@ -12,7 +12,7 @@ import {
   ChevronsRight,
   type LucideIcon,
 } from "lucide-react";
-import { MARKETPLACES } from "@/types/marketplace";
+import { MARKETPLACES, marketplaceSlug } from "@/types/marketplace";
 import { MARKETPLACE_THEMES } from "@/lib/theme/marketplace-colors";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 
@@ -94,7 +94,7 @@ export function Sidebar() {
           </div>
         )}
         {MARKETPLACES.map((m) => {
-          const href = `/marketplaces/${m.toLowerCase()}`;
+          const href = `/marketplaces/${marketplaceSlug(m)}`;
           return (
             <NavItem
               key={href}
