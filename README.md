@@ -89,9 +89,53 @@ not a demo.
   Done/"Low Value Cant Dispatch" are excluded everywhere
   (`isFullyExcludedStatus`, deliberately narrower than the older
   `isTerminalStatus` — the latter is still used, unchanged, by
-  `computeTimeline`/Operational Delay math, where Delivered also counts
-  as "done"). "Needs Review" is real unclassified ground, not a guess —
-  see below.
+  `computeTimeline`/Operational Delay math, where Delivered/Closed/
+  Completed also count as "done"). "Needs Review" is real unclassified
+  ground, not a guess — see below.
+
+**Bug found and fixed (not status-parsing, a priority-engine gap):**
+`computePoPriority` (`src/lib/rules/priority.ts`) used to score *every*
+PO handed to it, with no status check at all. Callers already restrict
+the ranked Control Tower table to Pending POs, but the Expired/
+Dispatched/Delivered/Needs Review secondary sections build their
+`PoRow`s the same way (`buildPoRows`) so the rule engine could match on
+unrelated criteria (PO Value, city, qty, ...) — and every row, in every
+section, opens the same `PoDetailPanel` that renders `PriorityBadge` +
+Score unconditionally. Net effect: a Delivered (or Cancelled/Closed/
+Dispatched) PO's own Status was read correctly, but clicking into it
+could still show a real, sometimes "Critical," priority score. Fixed by
+gating `computePoPriority` itself on `isPendingStatus` (returns
+score 0 / level "Unscored" for anything else) — the single shared entry
+point, not just the table columns that happen not to render score/level
+today — plus a second gate in `buildPoRows`'s City Workload bonus, which
+could otherwise re-introduce a non-zero score/level on its own for a
+non-Pending PO sitting in its batch's top city. Verified with a
+synthetic test: a Delivered/Cancelled/Closed/Dispatched PO with a huge
+PO Value, an already-past expiry date, and a rule that plainly matches
+on PO Value now scores 0/Unscored in every path (direct
+`computePoPriority` call and via `buildPoRows`), while a Pending PO in
+the same batch still scores normally — confirmed live too, clicking a
+real Delivered/Dispatched PO's detail panel on the actual Zepto data now
+shows "Unscored · Score 0" instead of a computed level.
+
+**Status parsing hardened at the same time** (`src/lib/sheets/
+marketplaces.ts`): a `normalizeStatus` step now runs after the
+first-non-blank field resolution described below — case-insensitive,
+trimmed matching against the confirmed vocabulary (Pending, Delivered,
+Dispatched, Cancelled, Closed, Completed, Scheduled), any other non-blank
+text preserved as-is rather than discarded, and a genuinely
+blank/undeterminable status (every row in a PO's group had an empty
+Status cell) becomes `"Unknown"` with a logged warning — never silently
+defaulted to Pending. Audited the whole parser for a Pending fallback:
+there wasn't one (`row["Status"] ?? ""` only guards a missing column,
+never guesses a value), but this makes "never default to Pending"
+explicit and enforced rather than merely true by omission. A temporary
+(intended to stay on) debug log for Flipkart Minutes prints, per PO:
+raw Status straight off the sheet, the normalized/parsed Status, whether
+the priority engine considers it eligible (mirrors
+`computePoPriority`'s own `isPendingStatus` gate exactly, so it's a true
+preview, not a separate guess), and why — plus a one-line validation
+summary of how many POs got a parsed PO Issue Date / Expiry Date.
 
 ## Demand Intelligence Engine
 

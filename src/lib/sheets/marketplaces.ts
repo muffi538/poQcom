@@ -1,6 +1,13 @@
 import { readSheetTab, readSheetTabRaw, extractSheetId } from "./client";
 import { loadSkuCostPriceMap } from "./price-master";
-import { PurchaseOrder, PoLineItem } from "@/types/purchase-order";
+import {
+  PurchaseOrder,
+  PoLineItem,
+  isPendingStatus,
+  isDeliveredStatus,
+  isDispatchedStatus,
+  isFullyExcludedStatus,
+} from "@/types/purchase-order";
 import { parseSheetDate } from "@/lib/po/dates";
 import {
   cityFromZeptoLocation,
@@ -266,6 +273,37 @@ function firstNonBlank<T extends string | null>(group: LineItem[], select: (line
   return select(group[0]);
 }
 
+// Canonical status vocabulary (confirmed mapping) — matched
+// case-insensitively and trimmed, so "delivered", "Delivered ", and
+// "DELIVERED" all resolve the same way. Any other non-blank text is
+// preserved as-is rather than discarded ("any additional valid status
+// should be preserved") — this is a normalizer, not a filter. A
+// genuinely blank/undeterminable status (every row in the PO's group had
+// an empty Status cell) is never silently treated as Pending — it
+// becomes "Unknown", logged as a warning, so a real parsing gap stays
+// visible instead of quietly mis-prioritizing the PO.
+const STATUS_ALIASES: Record<string, string> = {
+  pending: "Pending",
+  delivered: "Delivered",
+  dispatched: "Dispatched",
+  cancelled: "Cancelled",
+  cancel: "Cancelled",
+  closed: "Closed",
+  completed: "Completed",
+  scheduled: "Scheduled",
+};
+
+function normalizeStatus(raw: string, poNo: string, marketplace: SupportedMarketplace): string {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    console.warn(
+      `[${marketplace}] PO ${poNo}: no Status value found in any of its rows — set to "Unknown" (not defaulted to Pending).`
+    );
+    return "Unknown";
+  }
+  return STATUS_ALIASES[trimmed.toLowerCase()] ?? trimmed;
+}
+
 // Groups SKU line items back up into one row per PO Number (confirmed
 // approach, matching the BigBasket PO-level-aggregation decision), summing
 // quantities/value across lines and keeping the shared PO-level fields.
@@ -287,7 +325,8 @@ function aggregateLineItems(
     const first = group[0];
     const city = firstNonBlank(group, (l) => l.city);
     const warehouse = firstNonBlank(group, (l) => l.warehouse);
-    const status = firstNonBlank(group, (l) => l.status);
+    const rawStatus = firstNonBlank(group, (l) => l.status);
+    const status = normalizeStatus(rawStatus, poNo, marketplace);
     const poRaisedDate = firstNonBlank(group, (l) => l.poRaisedDate);
     const expiryDate = firstNonBlank(group, (l) => l.expiryDate);
     const appointmentDate = firstNonBlank(group, (l) => l.appointmentDate);
@@ -349,7 +388,7 @@ function aggregateLineItems(
       pendingQty: Math.max(0, orderedQty - dispatchedQty),
       poValue,
       status,
-      raw: { lineItems: group },
+      raw: { lineItems: group, rawStatus },
     });
   }
 
@@ -437,6 +476,48 @@ export async function fetchPurchaseOrders(
         statusCount("cancel") + statusCount("cancelled")
       }.`
   );
+
+  // Debug mode (Flipkart Minutes only, per confirmed ask): one line per
+  // PO showing exactly what the parser read (raw Status straight off the
+  // sheet, before normalizeStatus) vs. what it resolved to, plus whether
+  // the priority engine will actually score it — "Priority Eligible"
+  // mirrors computePoPriority's own gate (isPendingStatus) exactly, so
+  // this log is a true preview of what the engine will do, not a
+  // separate guess. Left in as a standing diagnostic, not removed after
+  // this session — the cheapest way to catch a status mismatch against
+  // the real sheet without re-deriving it by hand.
+  if (marketplace === "Flipkart Minutes") {
+    let missingExpiry = 0;
+    let missingPoRaised = 0;
+    for (const po of purchaseOrders) {
+      const rawStatus = typeof po.raw.rawStatus === "string" ? po.raw.rawStatus : "";
+      const eligible = isPendingStatus(po.status);
+      const reason = eligible
+        ? "Pending — eligible for prioritisation"
+        : isDeliveredStatus(po.status)
+          ? "Delivered PO"
+          : isDispatchedStatus(po.status)
+            ? "Dispatched — tracking only, not prioritised"
+            : isFullyExcludedStatus(po.status)
+              ? "Cancelled/RTO Done — excluded"
+              : po.status === "Closed" || po.status === "Completed"
+                ? `${po.status} PO — not prioritised`
+                : po.status === "Unknown"
+                  ? "Status could not be determined from the sheet"
+                  : "Non-Pending status — Needs Review, not prioritised";
+      console.log(
+        `[Flipkart Minutes][debug] PO: ${po.id} | Raw Status: "${rawStatus}" | Parsed Status: "${po.status}" | ` +
+          `Priority Eligible: ${eligible ? "Yes" : "No"} | Reason: ${reason}`
+      );
+      if (!po.expiryDate) missingExpiry++;
+      if (!po.poRaisedDate) missingPoRaised++;
+    }
+    console.log(
+      `[Flipkart Minutes][debug] Validation: ${purchaseOrders.length - missingPoRaised}/${purchaseOrders.length} ` +
+        `POs have a parsed PO Issue Date, ${purchaseOrders.length - missingExpiry}/${purchaseOrders.length} ` +
+        `have a parsed Expiry Date.`
+    );
+  }
 
   return purchaseOrders;
 }

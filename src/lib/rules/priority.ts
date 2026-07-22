@@ -1,4 +1,4 @@
-import { PurchaseOrder, PoPriorityResult } from "@/types/purchase-order";
+import { PurchaseOrder, PoPriorityResult, isPendingStatus } from "@/types/purchase-order";
 import { Rule } from "@/types/rules";
 import { EngineConfig, levelForScore } from "@/lib/config/store";
 import { computeTimeline } from "@/lib/po/derived";
@@ -23,6 +23,33 @@ export function computePoPriority(
   demandIndex: DemandIndex = EMPTY_DEMAND_INDEX,
   today: Date = new Date()
 ): PoPriorityResult {
+  // Priority scoring only ever runs for Status = Pending (confirmed) —
+  // callers already restrict the *ranked* table to Pending POs, but
+  // buildPoRows is also called on the Expired/Dispatched/Delivered/Needs
+  // Review batches for their read-only secondary sections, and every one
+  // of those rows can still be opened in the shared PoDetailPanel (which
+  // renders PriorityBadge + Score unconditionally). Without this gate a
+  // Delivered/Cancelled/Closed/Dispatched PO could still score high
+  // enough on unrelated rule criteria (PO Value, city, qty, ...) to show
+  // "Critical" the moment its detail panel is opened, even though its
+  // status is read correctly. Gating here — the single shared entry
+  // point — is what makes "never scored" true everywhere, not just in
+  // the table columns that happen not to render score/level today.
+  if (!isPendingStatus(po.status)) {
+    return {
+      poId: po.id,
+      score: 0,
+      level: "Unscored",
+      appliedRuleIds: [],
+      skippedRuleIds: rules.map((r) => r.id),
+      flags: [],
+      confidence: 0,
+      explanation: [],
+      recommendedActions: [],
+      demandHits: [],
+    };
+  }
+
   const timeline = computeTimeline(po, config, today);
   const ctx = buildEvalContext(po, timeline);
   const applicableRules = rules.filter(

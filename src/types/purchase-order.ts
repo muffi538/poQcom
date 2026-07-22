@@ -41,14 +41,19 @@ export interface PurchaseOrder {
 }
 
 // Statuses that mean the PO already reached a real end state — fulfilled,
-// returned, or cancelled. "Terminal" here means "no longer relevant for
-// Operational Delay tracking" (see computeTimeline) — it does NOT by
-// itself mean "hidden from the dashboard"; Delivered/Dispatched get their
-// own visible, read-only sections (confirmed: historical POs stay
-// available for analytics/dispatch-performance, not silently thrown
-// away) via isDeliveredStatus/isDispatchedStatus below. isFullyExcluded-
-// Status is the narrower set that's genuinely hidden everywhere.
-const TERMINAL_STATUS_EXACT = new Set(["delivered", "cancel", "cancelled", "rto done"]);
+// returned, cancelled, or otherwise closed out. "Terminal" here means "no
+// longer relevant for Operational Delay tracking" (see computeTimeline)
+// — it does NOT by itself mean "hidden from the dashboard"; Delivered/
+// Dispatched get their own visible, read-only sections (confirmed:
+// historical POs stay available for analytics/dispatch-performance, not
+// silently thrown away) via isDeliveredStatus/isDispatchedStatus below.
+// isFullyExcludedStatus is the narrower set that's genuinely hidden
+// everywhere. Closed/Completed are included here (confirmed: "ignore
+// expiry scoring for Delivered, Cancelled, Closed and Completed POs") but
+// not in isFullyExcludedStatus — they still show up in "Needs Review"
+// rather than disappearing, since nobody's asked for a dedicated section
+// for them yet.
+const TERMINAL_STATUS_EXACT = new Set(["delivered", "cancel", "cancelled", "rto done", "closed", "completed"]);
 
 export function isTerminalStatus(status: string): boolean {
   const normalized = status.trim().toLowerCase();

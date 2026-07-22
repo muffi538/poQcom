@@ -1,4 +1,4 @@
-import { PurchaseOrder, DemandSkuHit } from "@/types/purchase-order";
+import { PurchaseOrder, DemandSkuHit, isPendingStatus } from "@/types/purchase-order";
 import { Rule } from "@/types/rules";
 import { EngineConfig, levelForScore } from "@/lib/config/store";
 import { computeTimeline } from "@/lib/po/derived";
@@ -69,11 +69,19 @@ export function buildPoRows(
     const timeline = computeTimeline(po, config, today);
     const priority = computePoPriority(po, rules, config, demandIndex, today);
 
-    const isTopCity = topCity !== null && po.city === topCity;
+    // City Workload bonus only applies alongside real priority scoring —
+    // computePoPriority already refuses to score anything but Pending,
+    // but without this guard a Delivered/Cancelled/Closed PO sitting in
+    // its batch's top city would still pick up the +5 bonus on its own
+    // and get levelForScore'd into a real (non-Unscored) level, quietly
+    // reopening the same "non-Pending PO shows a priority" bug this gate
+    // exists to close.
+    const isPending = isPendingStatus(po.status);
+    const isTopCity = isPending && topCity !== null && po.city === topCity;
     const hadSignal = priority.level !== "Unscored";
     const score = priority.score + (isTopCity ? CITY_WORKLOAD_BONUS : 0);
     const level =
-      hadSignal || isTopCity ? levelForScore(score, config.levelThresholds) : "Unscored";
+      isPending && (hadSignal || isTopCity) ? levelForScore(score, config.levelThresholds) : "Unscored";
 
     return {
       po,
