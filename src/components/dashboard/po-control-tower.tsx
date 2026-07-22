@@ -253,21 +253,21 @@ export function PoControlTower({ rows, marketplaces, hasRules, demandError }: Pr
               <col style={{ width: COL.expiry }} />
               <col style={{ width: COL.delay }} />
               <col style={{ width: COL.demand }} />
-              <col />
+              <col style={{ minWidth: 220 }} />
             </colgroup>
             <thead className="sticky top-0 z-20 bg-white/95 text-[10px] font-semibold uppercase tracking-wide text-neutral-500 backdrop-blur dark:bg-neutral-900/95">
               <tr className="border-b border-frido-border dark:border-white/10">
-                <th className="sticky z-20 bg-white/95 px-1.5 py-1.5 backdrop-blur dark:bg-neutral-900/95" style={{ left: STICKY_LEFT.rank }}>
+                <th className="po-table-sticky-col sticky z-20 bg-white/95 px-1.5 py-1.5 backdrop-blur dark:bg-neutral-900/95" style={{ left: STICKY_LEFT.rank }}>
                   #
                 </th>
-                <th className="sticky z-20 bg-white/95 px-1.5 py-1.5 backdrop-blur dark:bg-neutral-900/95" style={{ left: STICKY_LEFT.priority }}>
+                <th className="po-table-sticky-col sticky z-20 bg-white/95 px-1.5 py-1.5 backdrop-blur dark:bg-neutral-900/95" style={{ left: STICKY_LEFT.priority }}>
                   Priority
                 </th>
-                <th className="sticky z-20 bg-white/95 px-1.5 py-1.5 backdrop-blur dark:bg-neutral-900/95" style={{ left: STICKY_LEFT.poNumber }}>
+                <th className="po-table-sticky-col sticky z-20 bg-white/95 px-1.5 py-1.5 backdrop-blur dark:bg-neutral-900/95" style={{ left: STICKY_LEFT.poNumber }}>
                   PO Number
                 </th>
                 <th
-                  className="sticky z-20 bg-white/95 px-1.5 py-1.5 backdrop-blur dark:bg-neutral-900/95"
+                  className="po-table-sticky-col sticky z-20 bg-white/95 px-1.5 py-1.5 backdrop-blur dark:bg-neutral-900/95"
                   style={{ left: STICKY_LEFT.marketplace, boxShadow: "2px 0 0 0 rgba(0,0,0,0.06)" }}
                 >
                   Mkt
@@ -282,7 +282,7 @@ export function PoControlTower({ rows, marketplaces, hasRules, demandError }: Pr
                 <th className="px-1.5 py-1.5" title="Demand Intelligence: contains a top-selling SKU for this marketplace">
                   <Flame size={11} />
                 </th>
-                <th className="px-1.5 py-1.5">Reason / Action</th>
+                <th className="min-w-[220px] px-1.5 py-1.5">Reason / Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100 text-[12px] dark:divide-white/5">
@@ -305,7 +305,7 @@ export function PoControlTower({ rows, marketplaces, hasRules, demandError }: Pr
                     className="group cursor-pointer transition-colors hover:bg-[var(--mp-primary)]/[0.06]"
                   >
                     <td
-                      className={`sticky z-10 bg-white px-1.5 py-1 text-neutral-500 transition-colors group-hover:bg-[#fbf9f2] dark:bg-neutral-900 dark:group-hover:bg-neutral-800 ${
+                      className={`po-table-sticky-col sticky z-10 bg-white px-1.5 py-1 text-neutral-500 transition-colors group-hover:bg-[#fbf9f2] dark:bg-neutral-900 dark:group-hover:bg-neutral-800 ${
                         r.isOverdue ? "border-l-2 border-l-[#d03b3b]" : ""
                       }`}
                       style={{ left: STICKY_LEFT.rank }}
@@ -313,7 +313,7 @@ export function PoControlTower({ rows, marketplaces, hasRules, demandError }: Pr
                       {r.rank || "—"}
                     </td>
                     <td
-                      className="sticky z-10 bg-white px-1.5 py-1 transition-colors group-hover:bg-[#fbf9f2] dark:bg-neutral-900 dark:group-hover:bg-neutral-800"
+                      className="po-table-sticky-col sticky z-10 bg-white px-1.5 py-1 transition-colors group-hover:bg-[#fbf9f2] dark:bg-neutral-900 dark:group-hover:bg-neutral-800"
                       style={{ left: STICKY_LEFT.priority }}
                     >
                       <div className="flex items-center gap-1">
@@ -322,14 +322,14 @@ export function PoControlTower({ rows, marketplaces, hasRules, demandError }: Pr
                       </div>
                     </td>
                     <td
-                      className="sticky z-10 truncate bg-white px-1.5 py-1 font-medium transition-colors group-hover:bg-[#fbf9f2] dark:bg-neutral-900 dark:group-hover:bg-neutral-800"
+                      className="po-table-sticky-col sticky z-10 truncate bg-white px-1.5 py-1 font-medium transition-colors group-hover:bg-[#fbf9f2] dark:bg-neutral-900 dark:group-hover:bg-neutral-800"
                       style={{ left: STICKY_LEFT.poNumber }}
                       title={r.po.id}
                     >
                       {r.po.id}
                     </td>
                     <td
-                      className="sticky z-10 bg-white px-1.5 py-1 transition-colors group-hover:bg-[#fbf9f2] dark:bg-neutral-900 dark:group-hover:bg-neutral-800"
+                      className="po-table-sticky-col sticky z-10 bg-white px-1.5 py-1 transition-colors group-hover:bg-[#fbf9f2] dark:bg-neutral-900 dark:group-hover:bg-neutral-800"
                       style={{ left: STICKY_LEFT.marketplace, boxShadow: "2px 0 0 0 rgba(0,0,0,0.04)" }}
                     >
                       <MarketplaceBadge marketplace={r.po.marketplace} compact />
@@ -350,7 +350,7 @@ export function PoControlTower({ rows, marketplaces, hasRules, demandError }: Pr
                     <td className="px-1.5 py-1 text-center" title={demandTitle}>
                       {isHighDemand && <Flame size={12} className="mx-auto text-[#ec835a]" />}
                     </td>
-                    <td className="truncate px-1.5 py-1 text-neutral-500" title={reason || undefined}>
+                    <td className="min-w-[220px] whitespace-normal break-words px-1.5 py-1 leading-snug text-neutral-500" title={reason || undefined}>
                       {reason || "—"}
                     </td>
                   </tr>

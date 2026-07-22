@@ -36,6 +36,21 @@
   }
 }
 
+/* The ranked table's sticky rank/priority/PO/marketplace columns are a
+   desktop enhancement (~318px, sized against a 1920px viewport) — on a
+   narrow viewport they can exceed the visible width entirely, which
+   means they permanently block every other column instead of helping:
+   there's no scroll position that reveals what's underneath. Below this
+   breakpoint, scrolling the whole row (nothing pinned) is strictly more
+   useful than a jammed one. */
+@media (max-width: 767px) {
+  .po-table-sticky-col {
+    position: static !important;
+    left: auto !important;
+    box-shadow: none !important;
+  }
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
