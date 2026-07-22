@@ -7,6 +7,10 @@ import { MarketplaceBadge } from "./marketplace-badge";
 import { StatusBadge } from "./status-badge";
 import { OperationalDelayBadge } from "./operational-delay";
 import { fmtDate, fmtCurrency } from "./po-format";
+import { ExportButton } from "./export-button";
+import { CsvCell } from "@/lib/export/csv";
+
+const EXPORT_HEADERS = ["Status", "Marketplace", "PO Number", "City", "PO Date", "Expiry Date", "Pending Qty", "PO Value", "Operational Delay (days)"];
 
 // Read-only table for POs that are deliberately NOT run through the
 // priority scoring chain (Expired, or a status nobody's confirmed how to
@@ -25,13 +29,28 @@ export function SecondaryPoTable({
 
   if (rows.length === 0) return null;
 
+  const exportRows: CsvCell[][] = rows.map((r) => [
+    r.po.status,
+    r.po.marketplace,
+    r.po.id,
+    r.po.city,
+    r.po.poRaisedDate || null,
+    r.po.expiryDate || null,
+    r.po.pendingQty,
+    r.po.poValue,
+    r.operationalDelayDays,
+  ]);
+
   return (
     <div className="space-y-1">
-      <div>
-        <h3 className="text-xs font-semibold">
-          {title} <span className="font-normal text-neutral-500">({rows.length})</span>
-        </h3>
-        {note && <p className="text-[11px] text-neutral-500">{note}</p>}
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <h3 className="text-xs font-semibold">
+            {title} <span className="font-normal text-neutral-500">({rows.length})</span>
+          </h3>
+          {note && <p className="text-[11px] text-neutral-500">{note}</p>}
+        </div>
+        <ExportButton headers={EXPORT_HEADERS} rows={exportRows} filename={`${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.csv`} />
       </div>
       <div className="glass-card overflow-hidden rounded-lg shadow-sm">
         <div className="max-h-[320px] overflow-auto">

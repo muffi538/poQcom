@@ -6,6 +6,10 @@ import { TopSkuRow, TopSkuTableResult } from "@/lib/demand/sku-table";
 import { KpiCard } from "./kpi-card";
 import { DemandTierBadge } from "./demand-tier-badge";
 import { SlideOverPortal } from "./slide-over-portal";
+import { ExportButton } from "./export-button";
+import { CsvCell } from "@/lib/export/csv";
+
+const EXPORT_HEADERS = ["Rank", "SKU", "Product", "GMV", "Units Sold", "Tier", "Priority Impact", "Pending POs", "Total Pending Qty"];
 
 function fmtLakh(value: number): string {
   if (value >= 100000) return `₹${(value / 100000).toFixed(1)}L`;
@@ -30,6 +34,22 @@ export function DemandIntelligence({
     const sliced = data.rows.slice(0, rangeLimit);
     return pendingOnly ? sliced.filter((r) => r.pendingPoIds.length > 0) : sliced;
   }, [data.rows, rangeLimit, pendingOnly]);
+
+  const exportRows: CsvCell[][] = useMemo(
+    () =>
+      visibleRows.map((r) => [
+        r.rank,
+        r.sku,
+        r.product,
+        r.gmv,
+        r.units,
+        r.tier,
+        r.points,
+        r.pendingPoIds.length,
+        r.totalPendingQty,
+      ]),
+    [visibleRows]
+  );
 
   if (data.rows.length === 0) {
     return (
@@ -79,6 +99,11 @@ export function DemandIntelligence({
           In Pending POs Only
         </button>
         <span className="text-[11px] text-neutral-500">{visibleRows.length} shown</span>
+        <ExportButton
+          headers={EXPORT_HEADERS}
+          rows={exportRows}
+          filename={`top-skus-${marketplace.toLowerCase().replace(/\s+/g, "-")}.csv`}
+        />
       </div>
 
       <div className="glass-card overflow-hidden rounded-lg shadow-sm">

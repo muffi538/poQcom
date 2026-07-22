@@ -9,6 +9,8 @@ import { OperationalDelayBadge } from "./operational-delay";
 import { PoDetailPanel } from "./po-detail-panel";
 import { fmtCurrency } from "./po-format";
 import { HIGH_DEMAND_RANK_THRESHOLD } from "@/lib/demand/rank";
+import { ExportButton } from "./export-button";
+import { CsvCell } from "@/lib/export/csv";
 
 type SortKey =
   | "priority"
@@ -62,6 +64,23 @@ const COL = {
   delay: 100,
   demand: 34,
 };
+const EXPORT_HEADERS = [
+  "Rank",
+  "Priority",
+  "PO Number",
+  "Marketplace",
+  "Score",
+  "City",
+  "FC / Warehouse",
+  "Pending Qty",
+  "PO Value",
+  "Expiry Date",
+  "Operational Delay (days)",
+  "Metro City",
+  "High Demand SKU",
+  "Reason / Action",
+];
+
 const STICKY_LEFT = {
   rank: 0,
   priority: COL.rank,
@@ -75,6 +94,15 @@ const inputClasses =
 function fmtShortDate(iso: string | null): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
+}
+
+// Shared between the on-screen Reason/Action cell and the CSV export so
+// the two never drift apart.
+function buildReasonText(r: PoRow): string {
+  const topHit = r.demandHits[0];
+  const isHighDemand = topHit !== undefined && topHit.rank <= HIGH_DEMAND_RANK_THRESHOLD;
+  const demandTag = isHighDemand ? `Top SKU #${topHit.rank} (${r.po.marketplace})` : null;
+  return [demandTag, r.rulesTriggered.join(", "), r.recommendedAction].filter(Boolean).join(" → ");
 }
 
 interface Props {
@@ -173,6 +201,32 @@ export function PoControlTower({ rows, marketplaces, hasRules, demandError }: Pr
 
   const sorted = useMemo(() => [...filtered].sort(SORTERS[sortKey]), [filtered, sortKey]);
 
+  // Exports exactly what's currently filtered/sorted on screen, not the
+  // full unfiltered rows — so the download matches what the user is
+  // actually looking at. Raw numbers/ISO dates, not display strings
+  // (no ₹ symbol, no thousands separators), so Excel treats them as
+  // numbers/dates rather than text.
+  const exportRows: CsvCell[][] = useMemo(
+    () =>
+      sorted.map((r) => [
+        r.rank || null,
+        r.level,
+        r.po.id,
+        r.po.marketplace,
+        r.score,
+        r.po.city,
+        r.po.warehouse,
+        r.po.pendingQty,
+        r.po.poValue,
+        r.po.expiryDate || null,
+        r.operationalDelayDays,
+        r.isMetroCity ? "Yes" : "No",
+        r.demandHits.some((h) => h.rank <= HIGH_DEMAND_RANK_THRESHOLD) ? "Yes" : "No",
+        buildReasonText(r) || "",
+      ]),
+    [sorted]
+  );
+
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-1.5">
@@ -220,6 +274,7 @@ export function PoControlTower({ rows, marketplaces, hasRules, demandError }: Pr
         <span className="text-[11px] text-neutral-500">
           {sorted.length} / {rows.length}
         </span>
+        <ExportButton headers={EXPORT_HEADERS} rows={exportRows} filename="po-control-tower.csv" />
       </div>
 
       {!hasRules && (
@@ -289,10 +344,7 @@ export function PoControlTower({ rows, marketplaces, hasRules, demandError }: Pr
               {sorted.map((r) => {
                 const topHit = r.demandHits[0];
                 const isHighDemand = topHit !== undefined && topHit.rank <= HIGH_DEMAND_RANK_THRESHOLD;
-                const demandTag = isHighDemand ? `Top SKU #${topHit.rank} (${r.po.marketplace})` : null;
-                const reason = [demandTag, r.rulesTriggered.join(", "), r.recommendedAction]
-                  .filter(Boolean)
-                  .join(" → ");
+                const reason = buildReasonText(r);
                 const demandTitle = r.demandHits.length
                   ? r.demandHits
                       .map((h) => `${h.sku} — ${r.po.marketplace} #${h.rank} best-seller (${fmtCurrency(h.gmv)} GMV, +${h.points})`)
