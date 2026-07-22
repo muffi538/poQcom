@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search, SearchX, ArrowUpDown, MapPinned, AlertTriangle, Flame } from "lucide-react";
+import { Search, SearchX, ArrowUpDown, AlertTriangle, Flame } from "lucide-react";
 import { PoRow } from "@/lib/dashboard/po-rows";
 import { PriorityBadge } from "./priority-badge";
 import { MarketplaceBadge } from "./marketplace-badge";
@@ -60,7 +60,6 @@ const COL = {
   value: 84,
   expiry: 76,
   delay: 100,
-  metro: 34,
   demand: 34,
 };
 const STICKY_LEFT = {
@@ -253,7 +252,6 @@ export function PoControlTower({ rows, marketplaces, hasRules, demandError }: Pr
               <col style={{ width: COL.value }} />
               <col style={{ width: COL.expiry }} />
               <col style={{ width: COL.delay }} />
-              <col style={{ width: COL.metro }} />
               <col style={{ width: COL.demand }} />
               <col />
             </colgroup>
@@ -281,9 +279,6 @@ export function PoControlTower({ rows, marketplaces, hasRules, demandError }: Pr
                 <th className="px-1.5 py-1.5 text-right">Value</th>
                 <th className="px-1.5 py-1.5">Expiry</th>
                 <th className="px-1.5 py-1.5">Delay</th>
-                <th className="px-1.5 py-1.5" title="Metro city">
-                  <MapPinned size={11} />
-                </th>
                 <th className="px-1.5 py-1.5" title="Demand Intelligence: contains a top-selling SKU for this marketplace">
                   <Flame size={11} />
                 </th>
@@ -352,7 +347,6 @@ export function PoControlTower({ rows, marketplaces, hasRules, demandError }: Pr
                     <td className="px-1.5 py-1">
                       <OperationalDelayBadge days={r.operationalDelayDays} compact />
                     </td>
-                    <td className="px-1.5 py-1 text-center">{r.isMetroCity ? "●" : ""}</td>
                     <td className="px-1.5 py-1 text-center" title={demandTitle}>
                       {isHighDemand && <Flame size={12} className="mx-auto text-[#ec835a]" />}
                     </td>
