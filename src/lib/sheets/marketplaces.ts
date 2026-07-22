@@ -169,6 +169,7 @@ function aggregateLineItems(
       sku: group.length > 1 ? `${first.sku} +${group.length - 1} more` : first.sku,
       skuDescription:
         group.length > 1 ? `${first.skuDescription} +${group.length - 1} more` : first.skuDescription,
+      skus: [...new Set(group.map((line) => line.sku).filter(Boolean))],
       poRaisedDate: first.poRaisedDate ?? "",
       expiryDate: first.expiryDate ?? "",
       appointmentDate: first.appointmentDate,

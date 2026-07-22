@@ -23,6 +23,7 @@ import { MarketplaceThemeScope } from "@/components/theme/marketplace-theme-scop
 import { fetchAllPurchaseOrders } from "@/lib/sheets/marketplaces";
 import { listRules } from "@/lib/rules/storage";
 import { getEngineConfig } from "@/lib/config/store";
+import { getDemandIndex } from "@/lib/demand";
 import { buildExecutiveSummary } from "@/lib/dashboard/summary";
 import { buildPoRows } from "@/lib/dashboard/po-rows";
 import { classifyStatus, isTerminalStatus, isLowValueCantDispatch } from "@/types/purchase-order";
@@ -50,10 +51,11 @@ export default async function OverviewPage() {
   let hasRules = false;
 
   try {
-    const [pos, rules, config] = await Promise.all([
+    const [pos, rules, config, demandIndex] = await Promise.all([
       fetchAllPurchaseOrders(),
       listRules(),
       getEngineConfig(),
+      getDemandIndex(),
     ]);
     hasRules = rules.some((r) => r.enabled);
 
@@ -68,10 +70,10 @@ export default async function OverviewPage() {
     const expiredPos = visiblePos.filter((po) => classifyStatus(po.status) === "expired");
     const needsReviewPos = visiblePos.filter((po) => classifyStatus(po.status) === "needs_review");
 
-    summary = buildExecutiveSummary(visiblePos, rules, config);
-    pendingRows = buildPoRows(pendingPos, rules, config);
-    expiredRows = buildPoRows(expiredPos, rules, config);
-    needsReviewRows = buildPoRows(needsReviewPos, rules, config);
+    summary = buildExecutiveSummary(visiblePos, rules, config, demandIndex);
+    pendingRows = buildPoRows(pendingPos, rules, config, demandIndex);
+    expiredRows = buildPoRows(expiredPos, rules, config, demandIndex);
+    needsReviewRows = buildPoRows(needsReviewPos, rules, config, demandIndex);
   } catch (err) {
     errorMessage = err instanceof Error ? err.message : "Failed to load PO data.";
   }

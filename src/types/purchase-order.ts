@@ -10,6 +10,7 @@ export interface PurchaseOrder {
   warehouse: string; // raw location/FC name the city was derived from
   sku: string;
   skuDescription: string;
+  skus: string[]; // every distinct SKU code on this PO (multi-SKU POs have >1) — the join key for Demand Intelligence
 
   poRaisedDate: string; // ISO date
   expiryDate: string; // ISO date

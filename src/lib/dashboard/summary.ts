@@ -4,6 +4,9 @@ import { EngineConfig } from "@/lib/config/store";
 import { computeTimeline } from "@/lib/po/derived";
 import { computePoPriority } from "@/lib/rules/priority";
 import { daysBetween } from "@/lib/po/dates";
+import { DemandIndex } from "@/lib/demand/rank";
+
+const EMPTY_DEMAND_INDEX: DemandIndex = new Map();
 
 export interface ExecutiveSummary {
   totalActive: number;
@@ -41,6 +44,7 @@ export function buildExecutiveSummary(
   pos: PurchaseOrder[],
   rules: Rule[],
   config: EngineConfig,
+  demandIndex: DemandIndex = EMPTY_DEMAND_INDEX,
   today: Date = new Date()
 ): ExecutiveSummary {
   const pendingPos = pos.filter((po) => isPendingStatus(po.status));
@@ -62,7 +66,7 @@ export function buildExecutiveSummary(
 
   for (const po of pendingPos) {
     const timeline = computeTimeline(po, config, today);
-    const priority = computePoPriority(po, rules, config, today);
+    const priority = computePoPriority(po, rules, config, demandIndex, today);
 
     switch (priority.level) {
       case "Critical":

@@ -87,6 +87,70 @@ not a demo.
   Done/Dispatched*/"Low Value Cant Dispatch" are excluded everywhere.
   "Needs Review" is real unclassified ground, not a guess — see below.
 
+## Demand Intelligence Engine
+
+A second data source — SKU-level sales (Platform, Category, Sub-Category,
+Master SKU, SKU ID, Product, GMV, Units, ASP, Spend, TACoS%) — now feeds
+into PO priority. Objective (confirmed): demand should influence dispatch
+priority, so a PO containing a marketplace's best-selling SKU outranks an
+otherwise-identical PO for a slow mover.
+
+- **Sheet structure** (confirmed, after weighing separate-tabs vs.
+  separate-workbook): a **separate Google Sheet** (`SALES_SHEET_URL` in
+  `.env`), not additional tabs in the PO workbook — the sales data has a
+  different owner/update cadence and no PO-specific columns to share.
+  Read the same way as the PO sheet (public CSV export, no service
+  account). Single "Product Summary" tab.
+- **Match key** (confirmed, verified against the real sheets): each PO
+  tab's `SKU` column already holds the same code as the sales sheet's
+  `Master SKU` column (e.g. `FR-TNP-SB1`) for all three marketplaces —
+  including Blinkit, where `SKU ID` is a different, Blinkit-internal
+  numeric ID and is NOT used for matching. No fuzzy matching needed.
+- **Per-marketplace ranking only** (confirmed) — a SKU's demand rank is
+  computed against its own marketplace's sales rows only
+  (`src/lib/demand/rank.ts`); Zepto POs are never compared against
+  Blinkit's sales data. Duplicate (platform, Master SKU) rows in the
+  sheet (56/144 combos on the sample data) are summed (GMV + Units) before
+  ranking. Ranking metric is GMV only, continuous rank per marketplace
+  (not a hard top-N cutoff).
+- **Scoring** (`src/lib/demand/score-po.ts`, confirmed tiered bands) —
+  rank 1–5: +25, 6–15: +15, 16–30: +10, 31–50: +5, beyond 50: +0. A
+  multi-SKU PO sums the contribution of **every** SKU on it that has
+  sales data (confirmed: "the more top-performing SKUs, the higher the
+  score", not single-best-SKU-wins). A SKU with no match in the sales
+  data contributes 0 (neutral) — combo/bundle packs fall back to this
+  same neutral treatment for now. Discontinued SKUs are not filtered
+  (confirmed: skip for now — the sheet has no active/discontinued
+  signal).
+- **City Workload bonus** (Priority Flow step 6, confirmed) — the single
+  city with the most POs in the batch being ranked gets a flat +5;
+  relative ranking, not tiered.
+- **Tiebreak** (Priority Flow step 7) — equal-score POs sort by PO Value,
+  then Pending Qty, then Marketplace (alphabetical; no order was
+  specified beyond "marketplace tiebreak", so this is a default worth
+  confirming if it ever matters in practice).
+- **"Unscored" logic updated** — a PO is "Unscored" only when nothing
+  fired at all: zero rules matched AND none of its SKUs have demand data.
+  A PO with only a demand contribution (no rule matched) now correctly
+  gets a real level via `levelForScore`, instead of falling back to
+  "Unscored".
+- **Explanation** — every demand-contributing SKU gets its own line, e.g.
+  `"FR-UCZP-R1 is Zepto's #4 best-selling SKU by GMV (₹6,08,208) — demand
+  priority +25"`, shown in the PO detail panel's "Why this priority"
+  list alongside rule-triggered lines and the always-real factual
+  highlights. A `"High-Demand SKU"` flag is added whenever any SKU on the
+  PO ranks in the top 5.
+- **Validated against the real sheets** — spot-checked Zepto PO
+  `P4915194` (5 SKUs, 4 matched: ranks #2/#4/#5/#11 → score 90 from
+  demand + 10 metro bonus = 100, Critical) and cross-checked Blinkit's
+  full GMV ranking independently; both matched the engine's output
+  exactly.
+- **Not yet built** (confirmed fast-follow, not simultaneous): the
+  "Demand Intelligence" dashboard section itself — Top Selling SKUs, Top
+  20 GMV, Fastest Moving, high-demand-low-pending-qty, SKUs in urgent
+  POs, marketplace demand trends. The scoring integration above is live;
+  this is a separate visualization layer on top of it.
+
 ## Design system
 
 Full visual redesign, no functional changes — same data/filters/sorting,
@@ -151,7 +215,8 @@ CSV/PDF export. Sorting, filtering, and click-to-drill-in already work.
 
 `.env` (copy from `.env.example`) — already pre-filled with your sheet's
 URL and the gids for the Zepto/Blinkit/Instamart POs tabs and the EAN
-pricing tab. `/settings` shows connection status read-only; nothing to
+pricing tab, plus `SALES_SHEET_URL` for the separate Demand Intelligence
+sales workbook. `/settings` shows connection status read-only; nothing to
 paste there today.
 
 ## Confirmed but not yet implemented

@@ -4,16 +4,27 @@ import { EngineConfig, levelForScore } from "@/lib/config/store";
 import { computeTimeline } from "@/lib/po/derived";
 import { buildEvalContext } from "./context";
 import { runRules } from "./engine";
+import { DemandIndex } from "@/lib/demand/rank";
+import { computeDemandContribution } from "@/lib/demand/score-po";
 
-// The one place PO + Rules + Config come together into a final priority
-// result. Level is score-derived only (confirmed) — computed here from
-// the engine's accumulated score via levelForScore, never set by a rule.
-// When zero rules match, the level is "Unscored" rather than an invented
-// default (confirmed) so coverage gaps in the rule set stay visible.
+const EMPTY_DEMAND_INDEX: DemandIndex = new Map();
+
+function formatGmv(gmv: number): string {
+  return `₹${Math.round(gmv).toLocaleString("en-IN")}`;
+}
+
+// The one place PO + Rules + Config + Demand Intelligence come together
+// into a final priority result. Level is score-derived only (confirmed)
+// — computed here from the combined accumulated score via
+// levelForScore, never set by a rule. When nothing produced a signal —
+// zero rules matched AND the PO's SKUs carry no demand data — the level
+// is "Unscored" rather than an invented default (confirmed), so coverage
+// gaps stay visible instead of silently reading as "Low".
 export function computePoPriority(
   po: PurchaseOrder,
   rules: Rule[],
   config: EngineConfig,
+  demandIndex: DemandIndex = EMPTY_DEMAND_INDEX,
   today: Date = new Date()
 ): PoPriorityResult {
   const timeline = computeTimeline(po, config, today);
@@ -23,15 +34,30 @@ export function computePoPriority(
   );
   const result = runRules(applicableRules, ctx);
 
+  // Demand Intelligence: compares this PO's SKUs only against its own
+  // marketplace's sales data (confirmed — never Zepto vs. Blinkit sales),
+  // summing the tiered per-rank score across every SKU on the PO.
+  const demand = computeDemandContribution(po, demandIndex);
+  const totalScore = result.score + demand.score;
+  const hasSignal = result.appliedRuleIds.length > 0 || demand.hits.length > 0;
+
+  const demandExplanation = demand.hits
+    .slice()
+    .sort((a, b) => a.rank - b.rank)
+    .map(
+      (hit) =>
+        `${hit.sku} is ${po.marketplace}'s #${hit.rank} best-selling SKU by GMV (${formatGmv(hit.gmv)}) — demand priority +${hit.points}`
+    );
+
   return {
     poId: po.id,
-    score: result.score,
-    level: result.appliedRuleIds.length > 0 ? levelForScore(result.score, config.levelThresholds) : "Unscored",
+    score: totalScore,
+    level: hasSignal ? levelForScore(totalScore, config.levelThresholds) : "Unscored",
     appliedRuleIds: result.appliedRuleIds,
     skippedRuleIds: result.skippedRuleIds,
-    flags: result.flags,
+    flags: demand.hits.some((h) => h.rank <= 5) ? [...result.flags, "High-Demand SKU"] : result.flags,
     confidence: result.confidence,
-    explanation: result.explanation,
+    explanation: [...result.explanation, ...demandExplanation],
     recommendedActions: result.recommendedActions,
   };
 }

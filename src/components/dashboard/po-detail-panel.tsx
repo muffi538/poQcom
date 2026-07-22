@@ -24,6 +24,7 @@ function buildFactualHighlights(row: PoRow): string[] {
   if (row.po.poValue !== null) lines.push(`Value: ${formatLakh(row.po.poValue)}`);
   if (row.appointmentScheduledTooLate) lines.push("Appointment scheduled after the PO's own expiry date");
   if (row.hasDataError) lines.push("Data error: PO Raised Date is after Expiry Date");
+  if (row.cityWorkloadBonus) lines.push(`${row.po.city} has the most pending POs in this view`);
   return lines;
 }
 
