@@ -121,7 +121,7 @@ export function Sidebar() {
         <ThemeToggle collapsed={collapsed} />
         <button
           onClick={() => setCollapsed((c) => !c)}
-          className="flex w-full items-center justify-center gap-2 rounded-xl border border-frido-border py-2 text-xs text-neutral-500 transition-colors hover:bg-neutral-50 dark:border-white/10 dark:hover:bg-neutral-900"
+          className="flex w-full items-center justify-center gap-2 rounded-md border border-frido-border py-1.5 text-xs text-neutral-500 transition-colors hover:bg-neutral-50 dark:border-white/10 dark:hover:bg-neutral-900"
         >
           {collapsed ? <ChevronsRight size={16} /> : <ChevronsLeft size={16} />}
           {!collapsed && "Collapse"}

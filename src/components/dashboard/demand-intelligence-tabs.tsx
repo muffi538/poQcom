@@ -29,7 +29,7 @@ export function DemandIntelligenceTabs({
             <button
               key={m}
               onClick={() => setActive(m)}
-              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+              className={`inline-flex items-center gap-1.5 rounded border px-2 py-1 text-[11px] font-medium transition-colors ${
                 active === m
                   ? "border-transparent text-white"
                   : "border-frido-border text-neutral-500 hover:bg-neutral-50 dark:border-white/10 dark:hover:bg-neutral-900"

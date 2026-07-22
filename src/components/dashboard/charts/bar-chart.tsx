@@ -39,16 +39,16 @@ export function BarChart({ title, data, colorMap, defaultColor = DEFAULT_HUE, va
 
   if (data.length === 0) {
     return (
-      <div className="glass-card rounded-card p-4 shadow-sm">
-        <h3 className="text-sm font-semibold">{title}</h3>
+      <div className="glass-card rounded-card p-3">
+        <h3 className="text-[13px] font-semibold">{title}</h3>
         <p className="mt-4 text-sm text-neutral-500">No data.</p>
       </div>
     );
   }
 
   return (
-    <div className="glass-card card-elevate animate-fade-in rounded-card p-4 shadow-sm">
-      <h3 className="text-sm font-semibold">{title}</h3>
+    <div className="glass-card rounded-card p-3">
+      <h3 className="text-[13px] font-semibold">{title}</h3>
       <svg
         viewBox={`0 0 400 ${chartHeight}`}
         className="mt-3 w-full"

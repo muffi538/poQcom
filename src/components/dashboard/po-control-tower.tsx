@@ -65,10 +65,11 @@ const COL = {
   demand: 34,
 };
 // Fixed row height (requirement: every row identical, no growing from
-// wrapped text or multiple reasons) — applied as an explicit height on
-// each <tr>, paired with single-line truncation on every cell so nothing
-// can push a row taller than this.
-const ROW_HEIGHT = "h-[56px]";
+// wrapped text or multiple reasons; target 38-42px for an enterprise-
+// dense table that shows 20-30 POs per screen) — applied as an explicit
+// height on each <tr>, paired with single-line truncation on every cell
+// so nothing can push a row taller than this.
+const ROW_HEIGHT = "h-10";
 
 const EXPORT_HEADERS = [
   "Rank",
@@ -96,6 +97,19 @@ const STICKY_LEFT = {
 
 const inputClasses =
   "rounded-lg border border-frido-border bg-white px-2 py-1 text-xs shadow-sm outline-none transition-colors focus:border-[var(--mp-accent)] dark:border-white/10 dark:bg-neutral-900";
+
+// Single-select Expiry bucket for the toolbar dropdown — distinct from
+// the OR-able "Overdue"/"Expiring ≤3d" quick-filter chips (those layer on
+// top of everything else; this picks exactly one bucket at a time, per
+// the confirmed toolbar filter set: City / Marketplace / Priority /
+// Expiry / Search).
+function matchesExpiryBucket(r: PoRow, bucket: string): boolean {
+  if (r.isOverdue) return bucket === "Overdue";
+  if (r.daysRemaining === 0) return bucket === "Due Today";
+  if (r.daysRemaining <= 3) return bucket === "≤3 Days";
+  if (r.daysRemaining <= 7) return bucket === "≤7 Days";
+  return bucket === "8+ Days";
+}
 
 function fmtShortDate(iso: string | null): string {
   if (!iso) return "—";
@@ -137,6 +151,7 @@ export function PoControlTower({ rows, marketplaces, hasRules, demandError }: Pr
   const [marketplaceFilter, setMarketplaceFilter] = useState<string>("all");
   const [cityFilter, setCityFilter] = useState<string>("all");
   const [levelFilter, setLevelFilter] = useState<string>("all");
+  const [expiryFilter, setExpiryFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [quickFilters, setQuickFilters] = useState<Set<QuickFilter>>(new Set());
   const [selected, setSelected] = useState<PoRow | null>(null);
@@ -144,6 +159,7 @@ export function PoControlTower({ rows, marketplaces, hasRules, demandError }: Pr
   const today = new Date().toISOString().slice(0, 10);
   const cities = useMemo(() => Array.from(new Set(rows.map((r) => r.po.city))).sort(), [rows]);
   const levels = ["Critical", "High", "Medium", "Low", "Unscored"];
+  const expiryBuckets = ["Overdue", "Due Today", "≤3 Days", "≤7 Days", "8+ Days"];
 
   // Counts shown on each chip reflect the whole Pending queue, independent
   // of whatever else is currently filtered — so the number always answers
@@ -199,6 +215,7 @@ export function PoControlTower({ rows, marketplaces, hasRules, demandError }: Pr
       if (marketplaceFilter !== "all" && r.po.marketplace !== marketplaceFilter) return false;
       if (cityFilter !== "all" && r.po.city !== cityFilter) return false;
       if (levelFilter !== "all" && r.level !== levelFilter) return false;
+      if (expiryFilter !== "all" && !matchesExpiryBucket(r, expiryFilter)) return false;
       if (!activeTests.every((test) => test(r))) return false;
       if (search.trim()) {
         const q = search.trim().toLowerCase();
@@ -207,7 +224,7 @@ export function PoControlTower({ rows, marketplaces, hasRules, demandError }: Pr
       return true;
       // eslint-disable-next-line react-hooks/exhaustive-deps
     });
-  }, [rows, marketplaceFilter, cityFilter, levelFilter, quickFilters, search]);
+  }, [rows, marketplaceFilter, cityFilter, levelFilter, expiryFilter, quickFilters, search]);
 
   const sorted = useMemo(() => [...filtered].sort(SORTERS[sortKey]), [filtered, sortKey]);
 
@@ -245,6 +262,7 @@ export function PoControlTower({ rows, marketplaces, hasRules, demandError }: Pr
         )}
         <FilterSelect label="City" value={cityFilter} onChange={setCityFilter} options={cities} />
         <FilterSelect label="Priority" value={levelFilter} onChange={setLevelFilter} options={levels} />
+        <FilterSelect label="Expiry" value={expiryFilter} onChange={setExpiryFilter} options={expiryBuckets} />
         <div className="relative">
           <Search size={12} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-neutral-400" />
           <input
@@ -261,7 +279,7 @@ export function PoControlTower({ rows, marketplaces, hasRules, demandError }: Pr
           <button
             key={d.key}
             onClick={() => toggleQuickFilter(d.key)}
-            className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+            className={`rounded border px-2 py-1 text-[11px] font-medium transition-colors ${
               quickFilters.has(d.key)
                 ? "border-[var(--mp-accent)] bg-[var(--mp-primary)]/20 text-[var(--mp-accent)]"
                 : "border-frido-border text-neutral-500 hover:bg-neutral-50 dark:border-white/10 dark:hover:bg-neutral-900"
@@ -302,8 +320,8 @@ export function PoControlTower({ rows, marketplaces, hasRules, demandError }: Pr
         </div>
       )}
 
-      <div className="glass-card overflow-hidden rounded-lg shadow-sm">
-        <div className="h-[78vh] overflow-auto">
+      <div className="glass-card overflow-hidden rounded-md">
+        <div className="h-[80vh] overflow-auto">
           <table className="w-full table-fixed border-collapse text-left">
             <colgroup>
               <col style={{ width: COL.rank }} />
@@ -320,19 +338,19 @@ export function PoControlTower({ rows, marketplaces, hasRules, demandError }: Pr
               <col style={{ width: COL.demand }} />
               <col style={{ minWidth: 220 }} />
             </colgroup>
-            <thead className="sticky top-0 z-20 bg-white/95 text-[10px] font-semibold uppercase tracking-wide text-neutral-500 backdrop-blur dark:bg-neutral-900/95">
+            <thead className="sticky top-0 z-20 bg-white text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:bg-neutral-900">
               <tr className="border-b border-frido-border dark:border-white/10">
-                <th className="po-table-sticky-col sticky z-20 bg-white/95 px-1.5 py-1.5 backdrop-blur dark:bg-neutral-900/95" style={{ left: STICKY_LEFT.rank }}>
+                <th className="po-table-sticky-col sticky z-20 bg-white px-1.5 py-1.5 dark:bg-neutral-900" style={{ left: STICKY_LEFT.rank }}>
                   #
                 </th>
-                <th className="po-table-sticky-col sticky z-20 bg-white/95 px-1.5 py-1.5 backdrop-blur dark:bg-neutral-900/95" style={{ left: STICKY_LEFT.priority }}>
+                <th className="po-table-sticky-col sticky z-20 bg-white px-1.5 py-1.5 dark:bg-neutral-900" style={{ left: STICKY_LEFT.priority }}>
                   Priority
                 </th>
-                <th className="po-table-sticky-col sticky z-20 bg-white/95 px-1.5 py-1.5 backdrop-blur dark:bg-neutral-900/95" style={{ left: STICKY_LEFT.poNumber }}>
+                <th className="po-table-sticky-col sticky z-20 bg-white px-1.5 py-1.5 dark:bg-neutral-900" style={{ left: STICKY_LEFT.poNumber }}>
                   PO Number
                 </th>
                 <th
-                  className="po-table-sticky-col sticky z-20 bg-white/95 px-1.5 py-1.5 backdrop-blur dark:bg-neutral-900/95"
+                  className="po-table-sticky-col sticky z-20 bg-white px-1.5 py-1.5 dark:bg-neutral-900"
                   style={{ left: STICKY_LEFT.marketplace, boxShadow: "2px 0 0 0 rgba(0,0,0,0.06)" }}
                 >
                   Mkt
@@ -420,7 +438,7 @@ export function PoControlTower({ rows, marketplaces, hasRules, demandError }: Pr
                       <div className="flex h-full items-center gap-1.5">
                         <span className="min-w-0 flex-1 truncate">{primaryReason}</span>
                         {moreCount > 0 && (
-                          <span className="shrink-0 whitespace-nowrap rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:bg-neutral-800">
+                          <span className="shrink-0 whitespace-nowrap rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:bg-neutral-800">
                             +{moreCount} more
                           </span>
                         )}

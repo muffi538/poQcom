@@ -16,13 +16,16 @@ export const MARKETPLACE_THEMES: Record<string, MarketplaceTheme> = {
   "Flipkart Minutes": { primary: "#2874F0", accent: "#4FA3FF" },
   Flipkart: { primary: "#2874F0", accent: "#4FA3FF" },
   Myntra: { primary: "#FF3F6C", accent: "#FF7096" },
-  Amazon: { primary: "#FF9900", accent: "#232F3E" },
+  // Confirmed: dark blue (not Amazon's real orange/black branding) —
+  // deliberate design-system choice for this dashboard's marketplace
+  // color set, not a copy of the marketplace's own brand.
+  Amazon: { primary: "#1B3A5C", accent: "#3B5A78" },
   FBF: { primary: "#00A86B", accent: "#00A86B" },
   "E-Trade": { primary: "#0099FF", accent: "#0099FF" },
 };
 
 // Overview / default brand identity.
-export const FRIDO_THEME: MarketplaceTheme = { primary: "#FFD400", accent: "#111111" };
+export const FRIDO_THEME: MarketplaceTheme = { primary: "#FFC700", accent: "#111111" };
 
 export function themeFor(marketplace: string | null): MarketplaceTheme {
   if (!marketplace) return FRIDO_THEME;

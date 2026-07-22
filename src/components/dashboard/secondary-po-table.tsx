@@ -52,9 +52,9 @@ export function SecondaryPoTable({
         </div>
         <ExportButton headers={EXPORT_HEADERS} rows={exportRows} filename={`${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.csv`} />
       </div>
-      <div className="glass-card overflow-hidden rounded-lg shadow-sm">
+      <div className="glass-card overflow-hidden rounded-md">
         <div className="max-h-[320px] overflow-auto">
-          <table className="w-full table-fixed border-collapse text-left text-[12px]">
+          <table className="w-full table-fixed border-collapse text-left text-[13px]">
             <colgroup>
               <col style={{ width: 110 }} />
               <col style={{ width: 84 }} />
@@ -66,7 +66,7 @@ export function SecondaryPoTable({
               <col style={{ width: 84 }} />
               <col style={{ width: 100 }} />
             </colgroup>
-            <thead className="sticky top-0 z-10 bg-white/95 text-[10px] font-semibold uppercase tracking-wide text-neutral-500 backdrop-blur dark:bg-neutral-900/95">
+            <thead className="sticky top-0 z-10 bg-white text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:bg-neutral-900">
               <tr className="border-b border-frido-border dark:border-white/10">
                 {["Status", "Mkt", "PO Number", "City", "PO Date", "Expiry", "Qty", "Value", "Op. Delay"].map((h) => (
                   <th key={h} className="whitespace-nowrap px-1.5 py-1.5">
@@ -80,25 +80,25 @@ export function SecondaryPoTable({
                 <tr
                   key={r.po.id}
                   onClick={() => setSelected(r)}
-                  className="cursor-pointer transition-colors hover:bg-[var(--mp-primary)]/[0.06]"
+                  className="h-10 cursor-pointer transition-colors hover:bg-[var(--mp-primary)]/[0.06]"
                 >
-                  <td className="truncate px-1.5 py-1">
+                  <td className="truncate px-1.5">
                     <StatusBadge status={r.po.status} compact />
                   </td>
-                  <td className="truncate px-1.5 py-1">
+                  <td className="truncate px-1.5">
                     <MarketplaceBadge marketplace={r.po.marketplace} compact />
                   </td>
-                  <td className="truncate px-1.5 py-1 font-medium" title={r.po.id}>
+                  <td className="truncate px-1.5 font-medium" title={r.po.id}>
                     {r.po.id}
                   </td>
-                  <td className="truncate px-1.5 py-1" title={r.po.city}>
+                  <td className="truncate px-1.5" title={r.po.city}>
                     {r.po.city}
                   </td>
-                  <td className="whitespace-nowrap px-1.5 py-1 text-neutral-500">{fmtDate(r.po.poRaisedDate)}</td>
-                  <td className="whitespace-nowrap px-1.5 py-1 text-neutral-500">{fmtDate(r.po.expiryDate)}</td>
-                  <td className="px-1.5 py-1 tabular-nums">{r.po.pendingQty.toLocaleString("en-IN")}</td>
-                  <td className="px-1.5 py-1 tabular-nums">{fmtCurrency(r.po.poValue)}</td>
-                  <td className="px-1.5 py-1">
+                  <td className="whitespace-nowrap px-1.5 text-neutral-500">{fmtDate(r.po.poRaisedDate)}</td>
+                  <td className="whitespace-nowrap px-1.5 text-neutral-500">{fmtDate(r.po.expiryDate)}</td>
+                  <td className="px-1.5 tabular-nums">{r.po.pendingQty.toLocaleString("en-IN")}</td>
+                  <td className="px-1.5 tabular-nums">{fmtCurrency(r.po.poValue)}</td>
+                  <td className="px-1.5">
                     <OperationalDelayBadge days={r.operationalDelayDays} compact />
                   </td>
                 </tr>

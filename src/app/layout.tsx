@@ -19,9 +19,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="flex min-h-screen bg-frido-bg font-sans text-neutral-900 antialiased dark:bg-neutral-950 dark:text-neutral-100">
         <Sidebar />
-        <main className="min-w-0 flex-1 px-3 py-3">
-          <div className="animate-fade-in-up">{children}</div>
-        </main>
+        <main className="min-w-0 flex-1 px-3 py-3">{children}</main>
       </body>
     </html>
   );

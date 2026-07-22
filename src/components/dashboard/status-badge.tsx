@@ -7,7 +7,7 @@ export function StatusBadge({ status, compact }: { status: string; compact?: boo
     );
   }
   return (
-    <span className="inline-flex items-center rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
+    <span className="inline-flex items-center rounded bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
       {status || "—"}
     </span>
   );

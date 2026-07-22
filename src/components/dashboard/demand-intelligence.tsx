@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { TrendingUp, PieChart, BarChart3, PackageSearch, X, MapPin, Boxes } from "lucide-react";
+import { X, MapPin, Boxes } from "lucide-react";
 import { TopSkuRow, TopSkuTableResult } from "@/lib/demand/sku-table";
 import { KpiCard } from "./kpi-card";
 import { DemandTierBadge } from "./demand-tier-badge";
@@ -53,7 +53,7 @@ export function DemandIntelligence({
 
   if (data.rows.length === 0) {
     return (
-      <div className="glass-card rounded-lg p-4 text-xs text-neutral-500">
+      <div className="glass-card rounded-md p-4 text-xs text-neutral-500">
         No sales data found for {marketplace} in the Demand Intelligence sheet.
       </div>
     );
@@ -68,10 +68,10 @@ export function DemandIntelligence({
       </div>
 
       <div className="flex flex-wrap gap-1">
-        <KpiCard label="Top 10 GMV Share" value={`${data.stats.top10GmvShare}%`} icon={PieChart} tone="accent" />
-        <KpiCard label="Top SKU GMV" value={fmtLakh(data.stats.topSkuGmv)} icon={TrendingUp} tone="accent" />
-        <KpiCard label="Average GMV" value={fmtLakh(data.stats.averageGmv)} icon={BarChart3} />
-        <KpiCard label="Open POs / Top SKUs" value={data.stats.openPosContainingTopSkus} icon={PackageSearch} tone="accent" />
+        <KpiCard label="Top 10 GMV Share" value={`${data.stats.top10GmvShare}%`} tone="accent" />
+        <KpiCard label="Top SKU GMV" value={fmtLakh(data.stats.topSkuGmv)} tone="accent" />
+        <KpiCard label="Average GMV" value={fmtLakh(data.stats.averageGmv)} />
+        <KpiCard label="Open POs / Top SKUs" value={data.stats.openPosContainingTopSkus} tone="accent" />
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">
@@ -79,7 +79,7 @@ export function DemandIntelligence({
           <button
             key={mode}
             onClick={() => setRange(mode)}
-            className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+            className={`rounded border px-2 py-1 text-[11px] font-medium transition-colors ${
               range === mode
                 ? "border-[var(--mp-accent)] bg-[var(--mp-primary)]/20 text-[var(--mp-accent)]"
                 : "border-frido-border text-neutral-500 hover:bg-neutral-50 dark:border-white/10 dark:hover:bg-neutral-900"
@@ -90,7 +90,7 @@ export function DemandIntelligence({
         ))}
         <button
           onClick={() => setPendingOnly((v) => !v)}
-          className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+          className={`rounded border px-2 py-1 text-[11px] font-medium transition-colors ${
             pendingOnly
               ? "border-[var(--mp-accent)] bg-[var(--mp-primary)]/20 text-[var(--mp-accent)]"
               : "border-frido-border text-neutral-500 hover:bg-neutral-50 dark:border-white/10 dark:hover:bg-neutral-900"
@@ -106,9 +106,9 @@ export function DemandIntelligence({
         />
       </div>
 
-      <div className="glass-card overflow-hidden rounded-lg shadow-sm">
+      <div className="glass-card overflow-hidden rounded-md">
         <div className="max-h-[420px] overflow-auto">
-          <table className="w-full table-fixed border-collapse text-left text-[12px]">
+          <table className="w-full table-fixed border-collapse text-left text-[13px]">
             <colgroup>
               <col style={{ width: 40 }} />
               <col style={{ width: 100 }} />
@@ -119,7 +119,7 @@ export function DemandIntelligence({
               <col style={{ width: 68 }} />
               <col />
             </colgroup>
-            <thead className="sticky top-0 z-10 bg-white/95 text-[10px] font-semibold uppercase tracking-wide text-neutral-500 backdrop-blur dark:bg-neutral-900/95">
+            <thead className="sticky top-0 z-10 bg-white text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:bg-neutral-900">
               <tr className="border-b border-frido-border dark:border-white/10">
                 <th className="px-1.5 py-1.5">#</th>
                 <th className="px-1.5 py-1.5">SKU</th>
@@ -138,26 +138,26 @@ export function DemandIntelligence({
                   <tr
                     key={r.sku}
                     onClick={() => setSelected(r)}
-                    className={`cursor-pointer transition-colors hover:bg-[var(--mp-primary)]/[0.08] ${
+                    className={`h-10 cursor-pointer transition-colors hover:bg-[var(--mp-primary)]/[0.08] ${
                       inPending ? "bg-[var(--mp-primary)]/[0.04]" : ""
                     }`}
                   >
-                    <td className="px-1.5 py-1 tabular-nums text-neutral-500">{r.rank}</td>
-                    <td className="truncate px-1.5 py-1 font-medium" title={r.sku}>
+                    <td className="px-1.5 tabular-nums text-neutral-500">{r.rank}</td>
+                    <td className="truncate px-1.5 font-medium" title={r.sku}>
                       {r.sku}
                     </td>
-                    <td className="truncate px-1.5 py-1 text-neutral-600 dark:text-neutral-400" title={r.product}>
+                    <td className="truncate px-1.5 text-neutral-600 dark:text-neutral-400" title={r.product}>
                       {r.product}
                     </td>
-                    <td className="px-1.5 py-1 text-right tabular-nums">{fmtLakh(r.gmv)}</td>
-                    <td className="px-1.5 py-1 text-right tabular-nums text-neutral-500">
+                    <td className="px-1.5 text-right tabular-nums">{fmtLakh(r.gmv)}</td>
+                    <td className="px-1.5 text-right tabular-nums text-neutral-500">
                       {r.units.toLocaleString("en-IN")}
                     </td>
-                    <td className="px-1.5 py-1">
+                    <td className="px-1.5">
                       <DemandTierBadge tier={r.tier} />
                     </td>
-                    <td className="px-1.5 py-1 text-right tabular-nums font-semibold">+{r.points}</td>
-                    <td className="px-1.5 py-1">
+                    <td className="px-1.5 text-right tabular-nums font-semibold">+{r.points}</td>
+                    <td className="px-1.5">
                       {inPending ? (
                         <span
                           className="inline-flex items-center gap-1 text-[11px] font-medium text-[var(--mp-accent)]"
@@ -197,9 +197,9 @@ function SkuDetailPanel({
 }) {
   return (
     <SlideOverPortal>
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-[2px]" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/40" onClick={onClose}>
       <div
-        className="animate-fade-in-up h-full w-full max-w-md overflow-y-auto rounded-l-3xl bg-white p-6 shadow-2xl dark:bg-neutral-900"
+        className="animate-fade-in-up h-full w-full max-w-md overflow-y-auto border-l border-frido-border bg-white p-6 shadow-lg dark:border-white/10 dark:bg-neutral-900"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between">
@@ -222,7 +222,7 @@ function SkuDetailPanel({
           <span className="text-sm text-neutral-500">Rank #{row.rank}</span>
         </div>
 
-        <dl className="mt-5 grid grid-cols-2 gap-4 rounded-2xl bg-neutral-50 p-4 text-sm dark:bg-neutral-800/40">
+        <dl className="mt-5 grid grid-cols-2 gap-4 rounded-md bg-neutral-50 p-4 text-sm dark:bg-neutral-800/40">
           <Field label="Marketplace Rank" value={`#${row.rank}`} />
           <Field label="GMV" value={fmtLakh(row.gmv)} />
           <Field label="Units Sold" value={row.units.toLocaleString("en-IN")} />
@@ -239,7 +239,7 @@ function SkuDetailPanel({
           {row.cities.length > 0 ? (
             <div className="mt-2 flex flex-wrap gap-1.5">
               {row.cities.map((c) => (
-                <span key={c} className="rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-medium dark:bg-neutral-800">
+                <span key={c} className="rounded bg-neutral-100 px-2 py-0.5 text-xs font-medium dark:bg-neutral-800">
                   {c}
                 </span>
               ))}
@@ -257,7 +257,7 @@ function SkuDetailPanel({
             </h3>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {row.pendingPoIds.map((id) => (
-                <span key={id} className="rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-medium dark:bg-neutral-800">
+                <span key={id} className="rounded bg-neutral-100 px-2 py-0.5 text-xs font-medium dark:bg-neutral-800">
                   {id}
                 </span>
               ))}

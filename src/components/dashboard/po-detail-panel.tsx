@@ -42,9 +42,9 @@ export function PoDetailPanel({ row, onClose }: { row: PoRow; onClose: () => voi
 
   return (
     <SlideOverPortal>
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/40 backdrop-blur-[2px]" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/40" onClick={onClose}>
       <div
-        className="animate-fade-in-up h-full w-full max-w-lg overflow-y-auto rounded-l-3xl bg-white p-6 shadow-2xl dark:bg-neutral-900"
+        className="animate-fade-in-up h-full w-full max-w-lg overflow-y-auto border-l border-frido-border bg-white p-6 shadow-lg dark:border-white/10 dark:bg-neutral-900"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between">
@@ -54,7 +54,7 @@ export function PoDetailPanel({ row, onClose }: { row: PoRow; onClose: () => voi
               <MarketplaceBadge marketplace={row.po.marketplace} />
               <StatusBadge status={row.po.status} />
               {row.isOverdue && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-[#d03b3b]/10 px-2.5 py-1 text-xs font-semibold text-[#9a2c2c] dark:text-[#ff9d9d]">
+                <span className="inline-flex items-center gap-1 rounded bg-[#d03b3b]/10 px-2 py-0.5 text-xs font-semibold text-[#9a2c2c] dark:text-[#ff9d9d]">
                   <AlertTriangle size={12} className="animate-pulse" /> Expired
                 </span>
               )}
@@ -76,7 +76,7 @@ export function PoDetailPanel({ row, onClose }: { row: PoRow; onClose: () => voi
           <span className="text-sm text-neutral-500">Score {row.score}</span>
         </div>
 
-        <dl className="mt-5 grid grid-cols-2 gap-4 rounded-2xl bg-neutral-50 p-4 text-sm dark:bg-neutral-800/40">
+        <dl className="mt-5 grid grid-cols-2 gap-4 rounded-md bg-neutral-50 p-4 text-sm dark:bg-neutral-800/40">
           <Field label="PO Date" value={fmtDate(row.po.poRaisedDate)} />
           <Field label="Expiry Date" value={fmtDate(row.po.expiryDate)} />
           <Field label="Appointment Date" value={fmtDate(row.po.appointmentDate)} />
@@ -100,12 +100,12 @@ export function PoDetailPanel({ row, onClose }: { row: PoRow; onClose: () => voi
         {(row.hasDataError || row.appointmentScheduledTooLate) && (
           <div className="mt-3 space-y-1.5">
             {row.hasDataError && (
-              <p className="rounded-xl bg-[#fab219]/15 px-3 py-2 text-xs font-medium text-[#8a5c00] dark:text-[#ffd479]">
+              <p className="rounded-md bg-[#fab219]/15 px-3 py-2 text-xs font-medium text-[#8a5c00] dark:text-[#ffd479]">
                 ⚠ Data error: PO Raised Date is after Expiry Date
               </p>
             )}
             {row.appointmentScheduledTooLate && (
-              <p className="rounded-xl bg-[#fab219]/15 px-3 py-2 text-xs font-medium text-[#8a5c00] dark:text-[#ffd479]">
+              <p className="rounded-md bg-[#fab219]/15 px-3 py-2 text-xs font-medium text-[#8a5c00] dark:text-[#ffd479]">
                 ⚠ Appointment scheduled too late — after the PO&apos;s own expiry date
               </p>
             )}
@@ -135,7 +135,7 @@ export function PoDetailPanel({ row, onClose }: { row: PoRow; onClose: () => voi
               <TrendingUp size={15} className="text-neutral-400" />
               Demand contribution
             </h3>
-            <div className="mt-2 overflow-hidden rounded-xl border border-frido-border dark:border-white/10">
+            <div className="mt-2 overflow-hidden rounded-md border border-frido-border dark:border-white/10">
               <table className="w-full text-left text-xs">
                 <thead className="bg-neutral-50 text-[10px] font-semibold uppercase tracking-wide text-neutral-500 dark:bg-neutral-800/40">
                   <tr>
@@ -193,7 +193,7 @@ export function PoDetailPanel({ row, onClose }: { row: PoRow; onClose: () => voi
             </h3>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {row.flags.map((f) => (
-                <span key={f} className="rounded-full bg-neutral-100 px-2.5 py-1 text-xs font-medium dark:bg-neutral-800">
+                <span key={f} className="rounded bg-neutral-100 px-2 py-0.5 text-xs font-medium dark:bg-neutral-800">
                   {f}
                 </span>
               ))}
@@ -201,7 +201,7 @@ export function PoDetailPanel({ row, onClose }: { row: PoRow; onClose: () => voi
           </div>
         )}
 
-        <div className="mt-6 rounded-2xl bg-[var(--mp-primary)]/10 p-4">
+        <div className="mt-6 rounded-md bg-[var(--mp-primary)]/10 p-4">
           <h3 className="flex items-center gap-1.5 text-sm font-semibold">
             <ArrowRight size={15} />
             Recommended action

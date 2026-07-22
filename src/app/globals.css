@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 :root {
-  --frido-yellow: #ffd400;
-  --mp-primary: #ffd400;
+  --frido-yellow: #ffc700;
+  --mp-primary: #ffc700;
   --mp-accent: #111111;
 }
 
@@ -15,12 +15,14 @@
 }
 
 @layer utilities {
+  /* Flat enterprise card: solid background, 1px light-grey border, no
+     blur/translucency/shadow (confirmed: "no glassmorphism, no floating
+     cards, no huge shadows" — this app should read like Power BI/SAP
+     Fiori/NetSuite, not a marketing site). Class name kept as-is even
+     though it's no longer "glass" — renaming it would touch ~20 files
+     for no behavioral gain. */
   .glass-card {
-    @apply border border-[#ECECEC] bg-white/80 backdrop-blur-sm dark:border-white/10 dark:bg-neutral-900/70;
-  }
-
-  .card-elevate {
-    @apply transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_8px_24px_-8px_rgba(0,0,0,0.12)] dark:hover:shadow-[0_8px_24px_-8px_rgba(0,0,0,0.5)];
+    @apply border border-frido-border bg-white dark:border-white/10 dark:bg-neutral-900;
   }
 
   .animate-fade-in {

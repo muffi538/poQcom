@@ -44,7 +44,7 @@ export function ThemeToggle({ collapsed }: { collapsed: boolean }) {
       <button
         onClick={() => choose(pref === "light" ? "dark" : pref === "dark" ? "system" : "light")}
         title={`Theme: ${current.label} (click to change)`}
-        className="flex items-center justify-center rounded-xl border border-frido-border p-2 text-neutral-500 transition-colors hover:bg-neutral-50 dark:border-white/10 dark:hover:bg-neutral-900"
+        className="flex items-center justify-center rounded-md border border-frido-border p-1.5 text-neutral-500 transition-colors hover:bg-neutral-50 dark:border-white/10 dark:hover:bg-neutral-900"
       >
         <Icon size={16} />
       </button>
@@ -52,14 +52,14 @@ export function ThemeToggle({ collapsed }: { collapsed: boolean }) {
   }
 
   return (
-    <div className="flex items-center gap-0.5 rounded-xl border border-frido-border p-0.5 dark:border-white/10">
+    <div className="flex items-center gap-0.5 rounded-md border border-frido-border p-0.5 dark:border-white/10">
       {OPTIONS.map(({ value, icon: Icon, label }) => (
         <button
           key={value}
           onClick={() => choose(value)}
           title={label}
           aria-pressed={pref === value}
-          className={`flex flex-1 items-center justify-center gap-1 rounded-[10px] px-2 py-1.5 text-xs font-medium transition-colors ${
+          className={`flex flex-1 items-center justify-center gap-1 rounded px-2 py-1.5 text-xs font-medium transition-colors ${
             pref === value
               ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
               : "text-neutral-500 hover:bg-neutral-50 dark:hover:bg-neutral-900"

@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import { Package, Boxes, Truck, Clock, AlertTriangle, ShieldAlert } from "lucide-react";
 import { MARKETPLACES, marketplaceSlug } from "@/types/marketplace";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { AwaitingConfig } from "@/components/dashboard/awaiting-config";
@@ -91,18 +90,17 @@ export default async function MarketplacePage({
           <AwaitingConfig title={`${marketplace} PO table`} items={[errorMessage]} />
         ) : summary ? (
           <div className="flex flex-wrap gap-1">
-            <KpiCard label="Pending Orders" value={summary.totalActive} icon={Package} tone="accent" />
-            <KpiCard label="Expired Pending" value={summary.expiredPending} icon={AlertTriangle} tone="critical" />
-            <KpiCard label="Pending Qty" value={summary.pendingQty} icon={Boxes} tone="accent" />
-            <KpiCard label="Avg Dispatch" value={fmtDays(summary.avgDispatchTimeDays)} icon={Truck} tone="accent" />
-            <KpiCard label="Avg Appt Delay" value={fmtDays(summary.avgAppointmentDelayDays)} icon={Clock} tone="accent" />
+            <KpiCard label="Pending Orders" value={summary.totalActive} tone="accent" />
+            <KpiCard label="Expired Pending" value={summary.expiredPending} tone="critical" />
+            <KpiCard label="Pending Qty" value={summary.pendingQty} tone="accent" />
+            <KpiCard label="Avg Dispatch" value={fmtDays(summary.avgDispatchTimeDays)} tone="accent" />
+            <KpiCard label="Avg Appt Delay" value={fmtDays(summary.avgAppointmentDelayDays)} tone="accent" />
             <KpiCard
               label="Avg Days Late"
               value={summary.avgOperationalDelayDaysLate === null ? "—" : `${summary.avgOperationalDelayDaysLate.toFixed(1)}d`}
-              icon={AlertTriangle}
               tone="critical"
             />
-            <KpiCard label="Risk (Crit+High)" value={summary.critical + summary.high} icon={ShieldAlert} tone="critical" />
+            <KpiCard label="Risk (Crit+High)" value={summary.critical + summary.high} tone="critical" />
           </div>
         ) : null}
 

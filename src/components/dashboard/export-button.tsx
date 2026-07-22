@@ -19,7 +19,7 @@ export function ExportButton({
       onClick={() => downloadCsv(filename, toCsv(headers, rows))}
       disabled={rows.length === 0}
       title="Export to Excel (downloads a .csv file — opens directly in Excel)"
-      className="inline-flex items-center gap-1 rounded-full border border-frido-border px-2.5 py-1 text-[11px] font-medium text-neutral-500 transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:hover:bg-neutral-900"
+      className="inline-flex items-center gap-1 rounded border border-frido-border px-2 py-1 text-[11px] font-medium text-neutral-500 transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:hover:bg-neutral-900"
     >
       <Download size={12} />
       {label}

@@ -262,9 +262,10 @@ fixed`, instead of letting content push columns wider — verified at
 clientWidth). Sticky columns: rank, Priority, PO Number, Marketplace
 (cumulative `left` offsets computed from the column widths, not
 guessed). Long text (FC/warehouse name, the Reason/Action column)
-truncates with `title=` for the full value on hover. Row height/font
-dropped to ~12px text with ~4-6px padding — about 30 rows visible per
-screen on a 1080p monitor.
+truncates with `title=` for the full value on hover. Row height/font at
+the time dropped to ~12px text with ~4-6px padding (superseded twice
+since — see "Row height / density pass" and "Enterprise redesign v2"
+below for the current fixed 40px row height).
 
 The old big "Expiring Soon / Metro Queue / Low Value Orders" section
 cards are gone — replaced with compact toggle chips in the filter
@@ -275,8 +276,9 @@ so by default the KPI strip + filters + table take up the page, per the
 requested "KPI strip → filters → full-width table" hierarchy.
 
 KPI cards shrunk ~55% (126px→118px wide, single line of text, hover
-tooltip on the label) and the sidebar narrowed (240px→176px expanded,
-64px→48px collapsed) to give the table more room.
+tooltip on the label — since redesigned again, see "Enterprise redesign
+v2" below) and the sidebar narrowed (240px→176px expanded, 64px→48px
+collapsed) to give the table more room.
 
 **Not built in this pass** (genuine new functionality, not layout):
 Excel-style column resize-by-drag, keyboard grid navigation
@@ -303,9 +305,9 @@ a visual copy.
 The ranked table's rows were briefly inconsistent height (a row with a
 long Reason/Action wrapped and grew taller than its neighbors, with
 large visual gaps between rows as a result). Fixed by going back to a
-hard fixed row height (`ROW_HEIGHT = "h-[56px]"` in
-`po-control-tower.tsx`) with `flex h-full items-center` wrappers for
-vertically centering badge cells, and switching long text back to
+hard fixed row height (56px at the time, since reduced to 40px — see
+"Enterprise redesign v2" below) with `flex h-full items-center` wrappers
+for vertically centering badge cells, and switching long text back to
 single-line `truncate` + `title=` tooltip instead of wrapping. The
 Reason/Action column now shows only the single highest-priority reason
 plus a "+N more" badge when there are others, instead of joining every
@@ -315,6 +317,74 @@ shared by every marketplace's table and the secondary tables, so
 Zepto/Blinkit/Instamart/Flipkart Minutes all look identical. The gap
 between the KPI strip and the table was also tightened
 (`space-y-2` → `space-y-1.5`) so it reads as one connected dashboard.
+
+## Enterprise redesign v2 (Power BI / SAP Fiori / NetSuite reference)
+
+A full visual pass across the whole app, using a screenshot of an
+internal Frido Demand Planning dashboard (Power BI-style: dense, flat,
+white background, big bold KPI numbers) as the design philosophy
+reference — not copied directly, but matched in spirit: clean,
+enterprise, dense, minimal scrolling, built for an ops team using it 8+
+hours a day. Concrete changes:
+
+- **Colors** — primary brand accent is now `#FFC700` ("Frido Yellow",
+  was `#FFD400`); page background is pure white (was `#F8F9FA`); Amazon's
+  marketplace color is now a deliberate dark navy blue (`#1B3A5C`) rather
+  than Amazon's own real-world orange/black branding — a design-system
+  choice for this dashboard's marketplace color set, confirmed distinct
+  from every other marketplace's hue. Every other marketplace color was
+  already correct (Zepto purple, Blinkit yellow, Instamart orange,
+  Flipkart Minutes blue, Myntra pink).
+- **No glassmorphism** — `.glass-card` (used by every card/table
+  container in the app) dropped `backdrop-blur`/translucency and is now a
+  flat solid white card with a 1px light-grey border; the `card-elevate`
+  hover-lift-with-shadow utility was removed outright (only one caller,
+  a bar chart). Border radius tokens shrank across the board (18px card
+  token → 8px; `rounded-xl`/`rounded-2xl`/`rounded-3xl` one-offs on
+  panels/callouts → `rounded-md`); slide-over detail panels lost their
+  `shadow-2xl` (→ `shadow-lg`) and backdrop blur on the overlay.
+- **KpiCard rewritten** (`src/components/dashboard/kpi-card.tsx`) — no
+  icon (confirmed brief: "Number / Small label / Tiny trend... nothing
+  else"); a big bold 28px tabular number is now the dominant element,
+  with a tiny uppercase muted label above it, and criticality shown as a
+  3px colored left border instead of an icon badge. Every `KpiCard`
+  caller (`page.tsx`, marketplace `page.tsx`, `demand-intelligence.tsx`)
+  had its `icon={...}` prop and now-unused lucide-react import removed.
+- **Badges are rectangles, not pills** — `PriorityBadge`, `StatusBadge`,
+  and `MarketplaceBadge`'s full-size variants (the compact table variants
+  were already rectangular) switched `rounded-full` → `rounded`; every
+  toggle/chip button across the app (quick-filter chips, Top-10/20/All
+  range toggles, marketplace tabs, flag/tag chips in detail panels) got
+  the same treatment, so nothing in the UI is pill-shaped anymore except
+  literal status dots (which are meant to read as dots).
+- **Row height 56px → 40px** (`ROW_HEIGHT` in `po-control-tower.tsx`,
+  same fixed-height/truncate approach as before, now denser) — 22 rows
+  visible without scrolling at 1920×1080 on the Overview page (was
+  fewer at 56px), within the requested 20-30-rows-on-screen target. The
+  same 40px row height was applied to `secondary-po-table.tsx` and
+  `demand-intelligence.tsx`'s table for consistency. Table header font
+  10px → 11px; sticky header background switched from translucent+blur
+  to solid (no longer needed once cards stopped being translucent).
+- **New Expiry filter** — a single-select dropdown (Overdue / Due Today /
+  ≤3 Days / ≤7 Days / 8+ Days) added to the Control Tower's toolbar,
+  alongside Marketplace/City/Priority/Search — distinct from the existing
+  OR-able "Overdue"/"Expiring ≤3d" quick-filter chips (dropdown picks
+  exactly one bucket; chips layer on top of everything else).
+- **Sidebar and slide-over polish** — collapse button and theme-toggle
+  buttons went from `rounded-xl` to `rounded-md`/`rounded`; removed the
+  root layout's page-navigation fade-in wrapper (`animate-fade-in-up` on
+  every route change was friction, not decoration, for a tool used all
+  day) while keeping the same animation on slide-over detail panels
+  (a legitimate entrance affordance for a panel that pops in, not a
+  full-page transition). `SlideOverPortal`'s comment was updated to stop
+  referencing the now-removed wrapper as its reason for existing — it's
+  kept as a general defense against any future ancestor transform, not
+  a workaround for one specific div anymore.
+- **Verified** via Playwright at 1920×1080 and 1366×768: row height
+  exactly 40px in both, zero page-level horizontal scroll, dark mode
+  renders correctly (flat dark cards, colored left-border accents still
+  visible), row click still opens the detail panel, filters/export still
+  work, real Zepto/Blinkit/Instamart data renders with no regressions.
 
 ## Where the Google Sheet link goes
 
