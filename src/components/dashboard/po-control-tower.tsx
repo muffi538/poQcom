@@ -82,6 +82,7 @@ interface Props {
   rows: PoRow[];
   marketplaces: string[]; // distinct marketplaces present — filter hidden when there's only one
   hasRules: boolean;
+  demandError?: string | null; // set when the Demand Intelligence sales sheet failed to load — scores below are rules-only
 }
 
 type QuickFilter =
@@ -94,7 +95,7 @@ type QuickFilter =
   | "lowValue"
   | "critical";
 
-export function PoControlTower({ rows, marketplaces, hasRules }: Props) {
+export function PoControlTower({ rows, marketplaces, hasRules, demandError }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>("priority");
   const [marketplaceFilter, setMarketplaceFilter] = useState<string>("all");
   const [cityFilter, setCityFilter] = useState<string>("all");
@@ -225,6 +226,15 @@ export function PoControlTower({ rows, marketplaces, hasRules }: Props) {
       {!hasRules && (
         <div className="rounded-lg border border-amber-300/60 bg-amber-50 px-2.5 py-1 text-[11px] text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
           Only 5 rules published — every already-overdue PO is still guaranteed Critical regardless.
+        </div>
+      )}
+      {demandError && (
+        <div
+          className="rounded-lg border border-amber-300/60 bg-amber-50 px-2.5 py-1 text-[11px] text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300"
+          title={demandError}
+        >
+          Demand Intelligence sales sheet failed to load — scores below reflect rules only, no SKU
+          demand data. ({demandError})
         </div>
       )}
 

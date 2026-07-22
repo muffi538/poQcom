@@ -49,15 +49,18 @@ export default async function OverviewPage() {
   let expiredRows: ReturnType<typeof buildPoRows> = [];
   let needsReviewRows: ReturnType<typeof buildPoRows> = [];
   let hasRules = false;
+  let demandError: string | null = null;
 
   try {
-    const [pos, rules, config, demandIndex] = await Promise.all([
+    const [pos, rules, config, demand] = await Promise.all([
       fetchAllPurchaseOrders(),
       listRules(),
       getEngineConfig(),
       getDemandIndex(),
     ]);
     hasRules = rules.some((r) => r.enabled);
+    const demandIndex = demand.index;
+    demandError = demand.error;
 
     // Status routing (confirmed): only "Pending" runs through the
     // priority scoring chain. "Expired" gets its own section instead of
@@ -114,7 +117,12 @@ export default async function OverviewPage() {
 
         {!errorMessage && (
           <>
-            <PoControlTower rows={pendingRows} marketplaces={[...MARKETPLACES]} hasRules={hasRules} />
+            <PoControlTower
+              rows={pendingRows}
+              marketplaces={[...MARKETPLACES]}
+              hasRules={hasRules}
+              demandError={demandError}
+            />
             <details className="glass-card rounded-lg px-3 py-1.5 text-xs">
               <summary className="cursor-pointer select-none font-medium text-neutral-500">
                 Expired POs, Needs Review, and Charts

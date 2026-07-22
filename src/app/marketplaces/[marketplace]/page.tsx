@@ -41,15 +41,18 @@ export default async function MarketplacePage({
   let expiredRows: ReturnType<typeof buildPoRows> = [];
   let needsReviewRows: ReturnType<typeof buildPoRows> = [];
   let hasRules = false;
+  let demandError: string | null = null;
 
   try {
-    const [pos, rules, config, demandIndex] = await Promise.all([
+    const [pos, rules, config, demand] = await Promise.all([
       fetchPurchaseOrders(marketplace as SupportedMarketplace),
       listRules(),
       getEngineConfig(),
       getDemandIndex(),
     ]);
     hasRules = rules.some((r) => r.enabled);
+    const demandIndex = demand.index;
+    demandError = demand.error;
 
     const visiblePos = pos.filter((po) => !isTerminalStatus(po.status) && !isLowValueCantDispatch(po.status));
     const pendingPos = visiblePos.filter((po) => classifyStatus(po.status) === "pending");
@@ -95,7 +98,12 @@ export default async function MarketplacePage({
 
         {!errorMessage && (
           <>
-            <PoControlTower rows={pendingRows} marketplaces={[marketplace]} hasRules={hasRules} />
+            <PoControlTower
+              rows={pendingRows}
+              marketplaces={[marketplace]}
+              hasRules={hasRules}
+              demandError={demandError}
+            />
             <details className="glass-card rounded-lg px-3 py-1.5 text-xs">
               <summary className="cursor-pointer select-none font-medium text-neutral-500">
                 Expired POs, Needs Review, and Charts
