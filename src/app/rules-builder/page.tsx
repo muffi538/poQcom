@@ -12,6 +12,10 @@ const toolbarActions = [
   { label: "Rule History", icon: History },
 ];
 
+// Rules live in Supabase and change independently of deploys — this page
+// must re-fetch on every request, never serve a build-time snapshot.
+export const dynamic = "force-dynamic";
+
 const OPERATOR_SYMBOL: Record<string, string> = {
   equals: "=",
   not_equals: "≠",

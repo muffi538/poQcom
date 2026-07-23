@@ -5,7 +5,8 @@ import { PoCharts } from "@/components/dashboard/po-charts";
 import { SecondaryPoTable } from "@/components/dashboard/secondary-po-table";
 import { DemandIntelligenceTabs } from "@/components/dashboard/demand-intelligence-tabs";
 import { MarketplaceThemeScope } from "@/components/theme/marketplace-theme-scope";
-import { fetchAllPurchaseOrders, SUPPORTED_MARKETPLACES, SupportedMarketplace } from "@/lib/sheets/marketplaces";
+import { SUPPORTED_MARKETPLACES, SupportedMarketplace } from "@/lib/sheets/marketplaces";
+import { fetchAllPurchaseOrdersFromSupabase } from "@/lib/data/purchase-orders";
 import { listRules } from "@/lib/rules/storage";
 import { getEngineConfig } from "@/lib/config/store";
 import { getDemandIndex } from "@/lib/demand";
@@ -27,6 +28,10 @@ function fmtDays(n: number | null): string {
   return n === null ? "—" : `${n.toFixed(1)}d`;
 }
 
+// Supabase is a live source of truth (updated by every sync) — this page
+// must re-fetch on every request, never serve a build-time snapshot.
+export const dynamic = "force-dynamic";
+
 
 export default async function OverviewPage() {
   let errorMessage: string | null = null;
@@ -42,7 +47,7 @@ export default async function OverviewPage() {
 
   try {
     const [pos, rules, config, demand] = await Promise.all([
-      fetchAllPurchaseOrders(),
+      fetchAllPurchaseOrdersFromSupabase(),
       listRules(),
       getEngineConfig(),
       getDemandIndex(),

@@ -3,6 +3,11 @@ import { MarketplaceThemeScope } from "@/components/theme/marketplace-theme-scop
 import { DataSyncClient } from "@/components/data-sync/data-sync-client";
 import { getSheetConnections, getSyncHistory, getAutoSyncSettings } from "./actions";
 
+// Sync state (connections, history, last-run time) changes on every
+// manual/auto sync — this page must re-fetch on every request, never
+// serve a build-time or cached snapshot.
+export const dynamic = "force-dynamic";
+
 export default async function DataSyncPage() {
   const [{ data: marketplaces }, connections, syncHistory, autoSyncSettings] = await Promise.all([
     supabase.from("marketplaces").select("id, name").eq("is_active", true).order("name"),

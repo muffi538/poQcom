@@ -37,6 +37,13 @@ export interface PurchaseOrder {
 
   status: string; // taken as-is from the sheet's Status column
 
+  // Dispatch workbook fields (Supabase-only — null for any PO the
+  // Dispatch sync hasn't matched yet, which is every PO before its
+  // first dispatch update, not an error).
+  fillRate: number | null; // (Dispatched Qty / Appt Qty) × 100, from the Dispatch sheet's own numbers
+  dispatcherName: string | null;
+  operationalDispatchDays: number | null; // Dispatch Date − this PO's own PO Raised Date
+
   raw: Record<string, unknown>; // untouched source row, for debugging/audit
 }
 

@@ -95,6 +95,12 @@ export function PoDetailPanel({ row, onClose }: { row: PoRow; onClose: () => voi
           <Field label="Dispatched Qty" value={row.po.dispatchedQty.toLocaleString("en-IN")} />
           <Field label="Pending Qty" value={row.po.pendingQty.toLocaleString("en-IN")} />
           <Field label="PO Value" value={fmtCurrency(row.po.poValue)} />
+          <Field
+            label="Days to Dispatch"
+            value={row.po.operationalDispatchDays === null ? "—" : `${row.po.operationalDispatchDays}d`}
+          />
+          <Field label="Fill Rate" value={row.po.fillRate === null ? "—" : `${row.po.fillRate}%`} />
+          <Field label="Dispatcher" value={row.po.dispatcherName ?? "—"} />
         </dl>
 
         {(row.hasDataError || row.appointmentScheduledTooLate) && (

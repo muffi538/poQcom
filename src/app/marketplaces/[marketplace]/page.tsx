@@ -4,7 +4,8 @@ import { KpiCard } from "@/components/dashboard/kpi-card";
 import { AwaitingConfig } from "@/components/dashboard/awaiting-config";
 import { MarketplaceTabbedView } from "@/components/dashboard/marketplace-tabbed-view";
 import { MarketplaceThemeScope } from "@/components/theme/marketplace-theme-scope";
-import { fetchPurchaseOrders, SupportedMarketplace } from "@/lib/sheets/marketplaces";
+import { SupportedMarketplace } from "@/lib/sheets/marketplaces";
+import { fetchPurchaseOrdersForMarketplaceName } from "@/lib/data/purchase-orders";
 import { listRules } from "@/lib/rules/storage";
 import { getEngineConfig } from "@/lib/config/store";
 import { getDemandIndex } from "@/lib/demand";
@@ -17,6 +18,10 @@ import { themeFor } from "@/lib/theme/marketplace-colors";
 export function generateStaticParams() {
   return MARKETPLACES.map((m) => ({ marketplace: marketplaceSlug(m) }));
 }
+
+// Supabase is a live source of truth (updated by every sync) — this page
+// must re-fetch on every request, never serve a build-time snapshot.
+export const dynamic = "force-dynamic";
 
 function fmtDays(n: number | null): string {
   return n === null ? "—" : `${n.toFixed(1)}d`;
@@ -47,7 +52,7 @@ export default async function MarketplacePage({
 
   try {
     const [pos, rules, config, demand] = await Promise.all([
-      fetchPurchaseOrders(marketplace as SupportedMarketplace),
+      fetchPurchaseOrdersForMarketplaceName(marketplace),
       listRules(),
       getEngineConfig(),
       getDemandIndex(),
