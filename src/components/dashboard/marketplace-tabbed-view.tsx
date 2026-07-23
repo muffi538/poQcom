@@ -8,6 +8,7 @@ import { SecondaryPoTable } from "./secondary-po-table";
 import { DemandIntelligence } from "./demand-intelligence";
 import { PoCharts } from "./po-charts";
 import { TopSkuTableResult } from "@/lib/demand/sku-table";
+import { DateFilterState } from "@/lib/dashboard/date-filter";
 
 type TabKey = "all" | "pending" | "critical" | "delivered" | "dispatched" | "cancelled" | "expired" | "needs_review";
 
@@ -43,6 +44,8 @@ export function MarketplaceTabbedView({
   demandError,
   topSkuData,
   accentHex,
+  dateFilter,
+  onDateFilterChange,
 }: {
   marketplace: string;
   pendingRows: PoRow[];
@@ -55,6 +58,8 @@ export function MarketplaceTabbedView({
   demandError?: string | null;
   topSkuData: TopSkuTableResult | null;
   accentHex: string;
+  dateFilter?: DateFilterState;
+  onDateFilterChange?: (next: DateFilterState) => void;
 }) {
   const [activeTab, setActiveTab] = useState<TabKey>("pending");
 
@@ -98,6 +103,8 @@ export function MarketplaceTabbedView({
           hasRules={hasRules}
           demandError={demandError}
           initialLevelFilter={activeTab === "critical" ? "Critical" : undefined}
+          dateFilter={dateFilter}
+          onDateFilterChange={onDateFilterChange}
         />
       )}
       {activeTab === "delivered" && (

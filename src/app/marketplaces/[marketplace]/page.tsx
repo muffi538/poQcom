@@ -1,19 +1,17 @@
 import { notFound } from "next/navigation";
 import { MARKETPLACES, marketplaceSlug } from "@/types/marketplace";
-import { KpiCard } from "@/components/dashboard/kpi-card";
 import { AwaitingConfig } from "@/components/dashboard/awaiting-config";
-import { MarketplaceTabbedView } from "@/components/dashboard/marketplace-tabbed-view";
+import { MarketplacePageClient } from "@/components/dashboard/marketplace-page-client";
 import { MarketplaceThemeScope } from "@/components/theme/marketplace-theme-scope";
-import { SupportedMarketplace } from "@/lib/sheets/marketplaces";
 import { fetchPurchaseOrdersForMarketplaceName } from "@/lib/data/purchase-orders";
 import { listRules } from "@/lib/rules/storage";
 import { getEngineConfig } from "@/lib/config/store";
 import { getDemandIndex } from "@/lib/demand";
-import { buildTopSkuTable, TopSkuTableResult } from "@/lib/demand/sku-table";
-import { buildExecutiveSummary } from "@/lib/dashboard/summary";
-import { buildPoRows } from "@/lib/dashboard/po-rows";
-import { classifyStatus, isFullyExcludedStatus, isLowValueCantDispatch } from "@/types/purchase-order";
 import { themeFor } from "@/lib/theme/marketplace-colors";
+import { PurchaseOrder } from "@/types/purchase-order";
+import { Rule } from "@/types/rules";
+import { EngineConfig } from "@/lib/config/engine-config";
+import { DemandIndex } from "@/lib/demand/rank";
 
 export function generateStaticParams() {
   return MARKETPLACES.map((m) => ({ marketplace: marketplaceSlug(m) }));
@@ -22,10 +20,6 @@ export function generateStaticParams() {
 // Supabase is a live source of truth (updated by every sync) — this page
 // must re-fetch on every request, never serve a build-time snapshot.
 export const dynamic = "force-dynamic";
-
-function fmtDays(n: number | null): string {
-  return n === null ? "—" : `${n.toFixed(1)}d`;
-}
 
 export default async function MarketplacePage({
   params,
@@ -39,44 +33,24 @@ export default async function MarketplacePage({
   if (!marketplace) notFound();
 
   let errorMessage: string | null = null;
-  let summary: Awaited<ReturnType<typeof buildExecutiveSummary>> | null = null;
-  let pendingRows: ReturnType<typeof buildPoRows> = [];
-  let expiredRows: ReturnType<typeof buildPoRows> = [];
-  let dispatchedRows: ReturnType<typeof buildPoRows> = [];
-  let deliveredRows: ReturnType<typeof buildPoRows> = [];
-  let cancelledRows: ReturnType<typeof buildPoRows> = [];
-  let needsReviewRows: ReturnType<typeof buildPoRows> = [];
-  let hasRules = false;
+  let pos: PurchaseOrder[] = [];
+  let rules: Rule[] = [];
+  let config: EngineConfig | null = null;
+  let demandIndex: DemandIndex = new Map();
   let demandError: string | null = null;
-  let topSkuData: TopSkuTableResult | null = null;
 
   try {
-    const [pos, rules, config, demand] = await Promise.all([
+    const [fetchedPos, fetchedRules, fetchedConfig, demand] = await Promise.all([
       fetchPurchaseOrdersForMarketplaceName(marketplace),
       listRules(),
       getEngineConfig(),
       getDemandIndex(),
     ]);
-    hasRules = rules.some((r) => r.enabled);
-    const demandIndex = demand.index;
+    pos = fetchedPos;
+    rules = fetchedRules;
+    config = fetchedConfig;
+    demandIndex = demand.index;
     demandError = demand.error;
-
-    const visiblePos = pos.filter((po) => !isFullyExcludedStatus(po.status) && !isLowValueCantDispatch(po.status));
-    const pendingPos = visiblePos.filter((po) => classifyStatus(po.status) === "pending");
-    const expiredPos = visiblePos.filter((po) => classifyStatus(po.status) === "expired");
-    const dispatchedPos = visiblePos.filter((po) => classifyStatus(po.status) === "dispatched");
-    const deliveredPos = visiblePos.filter((po) => classifyStatus(po.status) === "delivered");
-    const cancelledPos = visiblePos.filter((po) => classifyStatus(po.status) === "cancelled");
-    const needsReviewPos = visiblePos.filter((po) => classifyStatus(po.status) === "needs_review");
-
-    summary = buildExecutiveSummary(visiblePos, rules, config, demandIndex);
-    pendingRows = buildPoRows(pendingPos, rules, config, demandIndex);
-    expiredRows = buildPoRows(expiredPos, rules, config, demandIndex);
-    dispatchedRows = buildPoRows(dispatchedPos, rules, config, demandIndex);
-    deliveredRows = buildPoRows(deliveredPos, rules, config, demandIndex);
-    cancelledRows = buildPoRows(cancelledPos, rules, config, demandIndex);
-    needsReviewRows = buildPoRows(needsReviewPos, rules, config, demandIndex);
-    topSkuData = buildTopSkuTable(marketplace as SupportedMarketplace, demandIndex, pendingPos);
   } catch (err) {
     errorMessage = err instanceof Error ? err.message : "Failed to load PO data.";
   }
@@ -91,36 +65,16 @@ export default async function MarketplacePage({
           {marketplace}
         </h1>
 
-        {errorMessage ? (
-          <AwaitingConfig title={`${marketplace} PO table`} items={[errorMessage]} />
-        ) : summary ? (
-          <div className="flex flex-wrap gap-1">
-            <KpiCard label="Pending Orders" value={summary.totalActive} tone="accent" />
-            <KpiCard label="Expired Pending" value={summary.expiredPending} tone="critical" />
-            <KpiCard label="Pending Qty" value={summary.pendingQty} tone="accent" />
-            <KpiCard label="Avg Dispatch" value={fmtDays(summary.avgDispatchTimeDays)} tone="accent" />
-            <KpiCard label="Avg Appt Delay" value={fmtDays(summary.avgAppointmentDelayDays)} tone="accent" />
-            <KpiCard
-              label="Avg Days Late"
-              value={summary.avgOperationalDelayDaysLate === null ? "—" : `${summary.avgOperationalDelayDaysLate.toFixed(1)}d`}
-              tone="critical"
-            />
-            <KpiCard label="Risk (Crit+High)" value={summary.critical + summary.high} tone="critical" />
-          </div>
-        ) : null}
-
-        {!errorMessage && (
-          <MarketplaceTabbedView
+        {errorMessage || !config ? (
+          <AwaitingConfig title={`${marketplace} PO table`} items={[errorMessage ?? "Failed to load engine config."]} />
+        ) : (
+          <MarketplacePageClient
             marketplace={marketplace}
-            pendingRows={pendingRows}
-            deliveredRows={deliveredRows}
-            dispatchedRows={dispatchedRows}
-            cancelledRows={cancelledRows}
-            expiredRows={expiredRows}
-            needsReviewRows={needsReviewRows}
-            hasRules={hasRules}
+            pos={pos}
+            rules={rules}
+            config={config}
+            demandIndex={demandIndex}
             demandError={demandError}
-            topSkuData={topSkuData}
             accentHex={theme.primary}
           />
         )}

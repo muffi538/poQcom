@@ -1,6 +1,6 @@
 import { PurchaseOrder, PoTimeline, isTerminalStatus } from "@/types/purchase-order";
 import { daysBetween } from "./dates";
-import { EngineConfig } from "@/lib/config/store";
+import { EngineConfig } from "@/lib/config/engine-config";
 
 // "Today" is the actual current date — date filters (Year/Month/etc.)
 // narrow which POs are compared, they don't change what "today" means.

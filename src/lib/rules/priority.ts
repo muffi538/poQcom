@@ -1,6 +1,6 @@
 import { PurchaseOrder, PoPriorityResult, isPendingStatus } from "@/types/purchase-order";
 import { Rule } from "@/types/rules";
-import { EngineConfig, levelForScore } from "@/lib/config/store";
+import { EngineConfig, levelForScore } from "@/lib/config/engine-config";
 import { computeTimeline } from "@/lib/po/derived";
 import { buildEvalContext } from "./context";
 import { runRules } from "./engine";

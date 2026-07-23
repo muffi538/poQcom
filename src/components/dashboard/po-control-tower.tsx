@@ -11,6 +11,8 @@ import { fmtCurrency } from "./po-format";
 import { HIGH_DEMAND_RANK_THRESHOLD } from "@/lib/demand/rank";
 import { ExportButton } from "./export-button";
 import { CsvCell } from "@/lib/export/csv";
+import { DateFilterBar } from "./date-filter-bar";
+import { DateFilterState } from "@/lib/dashboard/date-filter";
 
 type SortKey =
   | "priority"
@@ -139,6 +141,12 @@ interface Props {
   // mount; the dropdown remains fully changeable afterward like any other
   // filter, this just decides where it starts.
   initialLevelFilter?: string;
+  // Lifted from the page-level client wrapper (Overview/marketplace),
+  // never local state here — the date filter also has to recompute
+  // KPIs/charts/secondary tables above this component, not just this
+  // table's own `rows`, which already arrive pre-filtered by date.
+  dateFilter?: DateFilterState;
+  onDateFilterChange?: (next: DateFilterState) => void;
 }
 
 type QuickFilter =
@@ -151,7 +159,15 @@ type QuickFilter =
   | "lowValue"
   | "critical";
 
-export function PoControlTower({ rows, marketplaces, hasRules, demandError, initialLevelFilter }: Props) {
+export function PoControlTower({
+  rows,
+  marketplaces,
+  hasRules,
+  demandError,
+  initialLevelFilter,
+  dateFilter,
+  onDateFilterChange,
+}: Props) {
   const [sortKey, setSortKey] = useState<SortKey>("priority");
   const [marketplaceFilter, setMarketplaceFilter] = useState<string>("all");
   const [cityFilter, setCityFilter] = useState<string>("all");
@@ -267,6 +283,7 @@ export function PoControlTower({ rows, marketplaces, hasRules, demandError, init
         )}
         <FilterSelect label="City" value={cityFilter} onChange={setCityFilter} options={cities} />
         <FilterSelect label="Priority" value={levelFilter} onChange={setLevelFilter} options={levels} />
+        {dateFilter && onDateFilterChange && <DateFilterBar filter={dateFilter} onChange={onDateFilterChange} />}
         <FilterSelect label="Expiry" value={expiryFilter} onChange={setExpiryFilter} options={expiryBuckets} />
         <div className="relative">
           <Search size={12} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-neutral-400" />

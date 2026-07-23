@@ -1,6 +1,6 @@
 import { PurchaseOrder, isPendingStatus, isExpiredStatus } from "@/types/purchase-order";
 import { Rule } from "@/types/rules";
-import { EngineConfig } from "@/lib/config/store";
+import { EngineConfig } from "@/lib/config/engine-config";
 import { computeTimeline } from "@/lib/po/derived";
 import { computePoPriority } from "@/lib/rules/priority";
 import { daysBetween } from "@/lib/po/dates";
