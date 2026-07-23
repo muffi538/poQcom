@@ -39,10 +39,26 @@ export async function loadFieldMappings(marketplaceId: string, workbookType: Wor
 // readSheetTab has always produced, just sourced from whichever raw
 // rows the caller passed in (Google Sheets CSV export or an uploaded
 // workbook, the importer downstream doesn't care which).
+//
+// First occurrence wins when a header name repeats (confirmed on the
+// real Flipkart Minutes PO sheet: "Status" appears once for the PO's own
+// status and again, later, for a per-consignment status — a plain
+// Object.fromEntries would silently keep the LAST one, which is the
+// wrong column here). This can't be solved by mapping a different sheet
+// column name — both occurrences share the same name — so this is a
+// deliberate, narrow exception to "match by name, not position": among
+// same-named columns, leftmost is the anchor.
 export function extractRowsByHeader(rawRows: string[][], mappings: FieldMapping[], label: string): Record<string, string>[] {
   const requiredColumns = mappings.filter((m) => m.isRequired).map((m) => m.sheetColumnName);
   const { headerRowIndex, header } = detectHeaderRow(rawRows, requiredColumns, label);
-  return rawRows.slice(headerRowIndex + 1).map((row) => Object.fromEntries(header.map((col, i) => [col, row[i] ?? ""])));
+  return rawRows.slice(headerRowIndex + 1).map((row) => {
+    const keyed: Record<string, string> = {};
+    header.forEach((col, i) => {
+      if (!col || col in keyed) return;
+      keyed[col] = row[i] ?? "";
+    });
+    return keyed;
+  });
 }
 
 // City-derivation is a real lookup/pattern-match transform (FC name →

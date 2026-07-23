@@ -1,7 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { loadFieldMappings, extractRowsByHeader } from "./field-mappings";
 import { toNumber } from "./parsing";
-import { parseSheetDate, daysBetween } from "@/lib/po/dates";
+import { parseSheetDateDayFirst, daysBetween } from "@/lib/po/dates";
 
 export interface ImportDispatchResult {
   posUpdated: number;
@@ -18,7 +18,10 @@ export interface ImportDispatchResult {
 // scope: the real sheet has no SKU column at all.
 //
 // Confirmed with the user (2026-07-23) against the real workbook, which
-// has no Status/PO Date/City/SKU columns:
+// has no Status/PO Date/City/SKU columns, and whose Dispatched Date
+// column is d/m/yyyy (this sheet's own locale) — unlike every PO/Sales
+// sheet, which is m/d/yyyy, so it needs parseSheetDateDayFirst, not
+// parseSheetDate:
 //   - status is set to the literal "Dispatched" for every matched row —
 //     this is a "Dispatched Consignment Checklist", every listed row has
 //     already left the warehouse. Not derived from dates or guessed.
@@ -58,7 +61,7 @@ export async function importDispatchWorkbookRows(params: {
 
   const lines = relevantRows.map((row) => ({
     poNo: get(row, "po_number"),
-    dispatchDate: parseSheetDate(get(row, "dispatch_date")),
+    dispatchDate: parseSheetDateDayFirst(get(row, "dispatch_date")),
     dispatchedQty: toNumber(get(row, "dispatched_qty")),
     apptQty: toNumber(get(row, "ordered_qty")),
     dispatcherName: get(row, "dispatcher_name") || null,
