@@ -9,9 +9,10 @@ import { DemandIntelligence } from "./demand-intelligence";
 import { PoCharts } from "./po-charts";
 import { TopSkuTableResult } from "@/lib/demand/sku-table";
 
-type TabKey = "pending" | "critical" | "delivered" | "dispatched" | "cancelled" | "expired" | "needs_review";
+type TabKey = "all" | "pending" | "critical" | "delivered" | "dispatched" | "cancelled" | "expired" | "needs_review";
 
 const TAB_LABELS: Record<TabKey, string> = {
+  all: "All",
   pending: "Pending",
   critical: "Critical",
   delivered: "Delivered",
@@ -59,7 +60,17 @@ export function MarketplaceTabbedView({
 
   const criticalCount = useMemo(() => pendingRows.filter((r) => r.level === "Critical").length, [pendingRows]);
 
+  // Every visible PO regardless of status, in one place — the six
+  // buckets above are mutually exclusive (classifyStatus assigns each PO
+  // to exactly one), so concatenating them is a safe union with no
+  // double-counting.
+  const allRows = useMemo(
+    () => [...pendingRows, ...deliveredRows, ...dispatchedRows, ...cancelledRows, ...expiredRows, ...needsReviewRows],
+    [pendingRows, deliveredRows, dispatchedRows, cancelledRows, expiredRows, needsReviewRows]
+  );
+
   const tabs = [
+    { key: "all", label: TAB_LABELS.all, count: allRows.length },
     { key: "pending", label: TAB_LABELS.pending, count: pendingRows.length },
     { key: "critical", label: TAB_LABELS.critical, count: criticalCount },
     { key: "delivered", label: TAB_LABELS.delivered, count: deliveredRows.length },
@@ -76,6 +87,9 @@ export function MarketplaceTabbedView({
       {/* key={activeTab} forces a clean remount per tab — each status
           bucket starts with its own default filters rather than carrying
           over whatever was set on the previously-viewed tab. */}
+      {activeTab === "all" && (
+        <SecondaryPoTable key={activeTab} title="All POs" note="Every status, combined — read-only." rows={allRows} />
+      )}
       {(activeTab === "pending" || activeTab === "critical") && (
         <PoControlTower
           key={activeTab}
