@@ -71,13 +71,20 @@ export function isDispatchedStatus(status: string): boolean {
   return status.trim().toLowerCase().startsWith("dispatched");
 }
 
-// Confirmed: Cancel/Cancelled/RTO Done are fully excluded everywhere —
-// unlike Delivered/Dispatched, there's no operational or analytics value
-// in surfacing them (nothing to dispatch, nothing to learn about timing).
-const FULLY_EXCLUDED_STATUS_EXACT = new Set(["cancel", "cancelled", "rto done"]);
+// RTO Done is fully excluded everywhere — nothing to dispatch, nothing
+// to learn about timing, and no operations team has asked to see it.
+// Cancel/Cancelled used to sit in this same set (silently hidden) but
+// now get their own visible "Cancelled" tab (confirmed) via
+// isCancelledStatus below, so they're deliberately NOT in this set.
+const FULLY_EXCLUDED_STATUS_EXACT = new Set(["rto done"]);
 
 export function isFullyExcludedStatus(status: string): boolean {
   return FULLY_EXCLUDED_STATUS_EXACT.has(status.trim().toLowerCase());
+}
+
+export function isCancelledStatus(status: string): boolean {
+  const normalized = status.trim().toLowerCase();
+  return normalized === "cancel" || normalized === "cancelled";
 }
 
 // Confirmed: "Low Value Cant Dispatch" is fully excluded too, same as
@@ -96,16 +103,25 @@ export function isPendingStatus(status: string): boolean {
 
 // Routes a PO to exactly one bucket, per the confirmed status handling:
 // only "Pending" runs through the priority scoring chain. "Expired",
-// "Dispatched", and "Delivered" each get their own read-only section
-// instead of being mixed into the ranked table. Cancel/Cancelled/RTO
-// Done/Low Value Cant Dispatch are hidden entirely. Anything else
-// (Price issue, Scheduled, Revised appt. required, ...) is real,
-// unclassified ground — surfaced as "Needs Review" rather than silently
-// scored or silently hidden, until confirmed.
-export type StatusBucket = "pending" | "expired" | "dispatched" | "delivered" | "excluded" | "needs_review";
+// "Dispatched", "Delivered", and "Cancelled" each get their own
+// read-only section/tab instead of being mixed into the ranked table or
+// silently dropped. Only RTO Done/Low Value Cant Dispatch are hidden
+// entirely — nobody's asked to see those. Anything else (Price issue,
+// Scheduled, Revised appt. required, ...) is real, unclassified ground —
+// surfaced as "Needs Review" rather than silently scored or hidden,
+// until confirmed.
+export type StatusBucket =
+  | "pending"
+  | "expired"
+  | "dispatched"
+  | "delivered"
+  | "cancelled"
+  | "excluded"
+  | "needs_review";
 
 export function classifyStatus(status: string): StatusBucket {
   if (isFullyExcludedStatus(status) || isLowValueCantDispatch(status)) return "excluded";
+  if (isCancelledStatus(status)) return "cancelled";
   if (isDeliveredStatus(status)) return "delivered";
   if (isDispatchedStatus(status)) return "dispatched";
   if (isExpiredStatus(status)) return "expired";

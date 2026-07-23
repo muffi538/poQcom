@@ -81,17 +81,18 @@ not a demo.
 - **Status routing** (`classifyStatus` in `src/types/purchase-order.ts`,
   confirmed) — only Status = "Pending" runs through the priority scoring
   chain and appears in the ranked Control Tower table. "Expired",
-  "Dispatched", "Delivered", and "Needs Review" (any other status —
-  Price issue, Scheduled, Revised appt. required) each get their own
-  read-only section instead of being scored alongside Pending or hidden
-  outright — historical POs stay visible for dispatch-performance/
-  analytics rather than silently disappearing. Only Cancel/Cancelled/RTO
-  Done/"Low Value Cant Dispatch" are excluded everywhere
-  (`isFullyExcludedStatus`, deliberately narrower than the older
-  `isTerminalStatus` — the latter is still used, unchanged, by
-  `computeTimeline`/Operational Delay math, where Delivered/Closed/
-  Completed also count as "done"). "Needs Review" is real unclassified
-  ground, not a guess — see below.
+  "Dispatched", "Delivered", "Cancelled", and "Needs Review" (any other
+  status — Price issue, Scheduled, Revised appt. required) each get
+  their own read-only tab instead of being scored alongside Pending or
+  hidden outright — historical POs stay visible for dispatch-
+  performance/analytics rather than silently disappearing. Cancelled
+  used to be fully hidden (silently dropped) but now gets its own
+  visible tab too (confirmed) — only RTO Done/"Low Value Cant Dispatch"
+  are excluded everywhere (`isFullyExcludedStatus`, deliberately
+  narrower than the older `isTerminalStatus` — the latter is still used,
+  unchanged, by `computeTimeline`/Operational Delay math, where
+  Delivered/Cancelled/Closed/Completed also count as "done"). "Needs
+  Review" is real unclassified ground, not a guess — see below.
 
 **Bug found and fixed (not status-parsing, a priority-engine gap):**
 `computePoPriority` (`src/lib/rules/priority.ts`) used to score *every*
@@ -385,6 +386,58 @@ hours a day. Concrete changes:
   renders correctly (flat dark cards, colored left-border accents still
   visible), row click still opens the detail panel, filters/export still
   work, real Zepto/Blinkit/Instamart data renders with no regressions.
+
+## Sticky status tab bar (marketplace pages)
+
+Replaced the collapsed `<details>` block ("Expired, Dispatched,
+Delivered, Needs Review, and Charts" — you had to click it open, then
+scroll, to see anything but Pending) with a sticky tab bar directly
+below the KPI strip: Pending / Critical / Delivered / Dispatched /
+Cancelled / Expired / Needs Review, each with a live count, one click to
+switch, no page reload. Scoped to the marketplace pages only
+(`/marketplaces/[marketplace]`) — Overview wasn't asked for and pools
+all four marketplaces together, a different enough shape that tabbing
+it wasn't in scope here.
+
+- **New component** `MarketplaceTabbedView`
+  (`src/components/dashboard/marketplace-tabbed-view.tsx`, client-side)
+  owns which tab is active — entirely separate state from each table's
+  own City/Search/Priority filters, so changing a filter never resets
+  the selected tab, and switching tabs is instant (client-side
+  `useState`, not a route change).
+- **"Critical" is a shortcut, not a real status** — it shows the exact
+  same Pending rows in the same ranked `PoControlTower`, just with the
+  Priority filter pre-set to Critical (`initialLevelFilter` prop, new).
+  The dropdown stays fully usable afterward; this only decides where it
+  starts.
+- **Cancelled is a new, real, visible bucket** (confirmed) — previously
+  Cancel/Cancelled sat in `isFullyExcludedStatus` and were silently
+  dropped everywhere, same as RTO Done. Now only RTO Done stays fully
+  hidden (`isCancelledStatus`, new; `StatusBucket` gained a `"cancelled"`
+  member). No priority scoring or Operational Delay applies to it
+  (`isTerminalStatus` already covered "cancel"/"cancelled" before this
+  change, so that part needed no update) — it's read-only history, same
+  as Delivered/Dispatched.
+- **Every non-Pending tab gained City + Search filters**
+  (`SecondaryPoTable` now has its own small toolbar, matching the
+  ranked table's style) — previously these read-only tables had no
+  filtering at all. Priority is deliberately absent there — nothing on
+  those tabs is priority-scored, so a Priority filter would have nothing
+  real to filter by.
+- Switching between tabs remounts whichever table is showing (`key=
+  {activeTab}`) rather than trying to preserve one table's filter state
+  across a totally different bucket of POs — a clean slate per tab,
+  which is how tab metaphors normally work elsewhere (browser tabs,
+  spreadsheet sheet tabs, etc.).
+- Sticky via plain CSS `sticky top-0` — no scroll-container gymnastics
+  needed since the page scrolls in the normal document flow; confirmed
+  it stays pinned to the viewport top on scroll via Playwright (bounding
+  box `top: 0` after scrolling 400px down).
+- Verified against real Zepto/Blinkit/Instamart/Flipkart Minutes data:
+  all 7 tabs render with correct live counts, clicking each one filters
+  the table instantly with no reload, the Critical shortcut correctly
+  shows only Critical-level rows, Cancelled POs are now visible (17 on
+  Zepto, previously invisible), and dark mode renders correctly.
 
 ## Where the Google Sheet link goes
 

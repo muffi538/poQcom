@@ -2,10 +2,7 @@ import { notFound } from "next/navigation";
 import { MARKETPLACES, marketplaceSlug } from "@/types/marketplace";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { AwaitingConfig } from "@/components/dashboard/awaiting-config";
-import { PoControlTower } from "@/components/dashboard/po-control-tower";
-import { PoCharts } from "@/components/dashboard/po-charts";
-import { SecondaryPoTable } from "@/components/dashboard/secondary-po-table";
-import { DemandIntelligence } from "@/components/dashboard/demand-intelligence";
+import { MarketplaceTabbedView } from "@/components/dashboard/marketplace-tabbed-view";
 import { MarketplaceThemeScope } from "@/components/theme/marketplace-theme-scope";
 import { fetchPurchaseOrders, SupportedMarketplace } from "@/lib/sheets/marketplaces";
 import { listRules } from "@/lib/rules/storage";
@@ -42,6 +39,7 @@ export default async function MarketplacePage({
   let expiredRows: ReturnType<typeof buildPoRows> = [];
   let dispatchedRows: ReturnType<typeof buildPoRows> = [];
   let deliveredRows: ReturnType<typeof buildPoRows> = [];
+  let cancelledRows: ReturnType<typeof buildPoRows> = [];
   let needsReviewRows: ReturnType<typeof buildPoRows> = [];
   let hasRules = false;
   let demandError: string | null = null;
@@ -63,6 +61,7 @@ export default async function MarketplacePage({
     const expiredPos = visiblePos.filter((po) => classifyStatus(po.status) === "expired");
     const dispatchedPos = visiblePos.filter((po) => classifyStatus(po.status) === "dispatched");
     const deliveredPos = visiblePos.filter((po) => classifyStatus(po.status) === "delivered");
+    const cancelledPos = visiblePos.filter((po) => classifyStatus(po.status) === "cancelled");
     const needsReviewPos = visiblePos.filter((po) => classifyStatus(po.status) === "needs_review");
 
     summary = buildExecutiveSummary(visiblePos, rules, config, demandIndex);
@@ -70,6 +69,7 @@ export default async function MarketplacePage({
     expiredRows = buildPoRows(expiredPos, rules, config, demandIndex);
     dispatchedRows = buildPoRows(dispatchedPos, rules, config, demandIndex);
     deliveredRows = buildPoRows(deliveredPos, rules, config, demandIndex);
+    cancelledRows = buildPoRows(cancelledPos, rules, config, demandIndex);
     needsReviewRows = buildPoRows(needsReviewPos, rules, config, demandIndex);
     topSkuData = buildTopSkuTable(marketplace as SupportedMarketplace, demandIndex, pendingPos);
   } catch (err) {
@@ -105,39 +105,19 @@ export default async function MarketplacePage({
         ) : null}
 
         {!errorMessage && (
-          <>
-            <PoControlTower
-              rows={pendingRows}
-              marketplaces={[marketplace]}
-              hasRules={hasRules}
-              demandError={demandError}
-            />
-            {topSkuData && <DemandIntelligence marketplace={marketplace} data={topSkuData} />}
-            <details className="glass-card rounded-lg px-3 py-1.5 text-xs">
-              <summary className="cursor-pointer select-none font-medium text-neutral-500">
-                Expired, Dispatched, Delivered, Needs Review, and Charts
-              </summary>
-              <div className="mt-2 space-y-3 pb-1">
-                <SecondaryPoTable title="Expired POs" rows={expiredRows} />
-                <SecondaryPoTable
-                  title="Dispatched POs"
-                  note="Already shipped — read-only, kept for dispatch-performance history."
-                  rows={dispatchedRows}
-                />
-                <SecondaryPoTable
-                  title="Delivered POs"
-                  note="Fulfilled — read-only, kept for analytics/trends."
-                  rows={deliveredRows}
-                />
-                <SecondaryPoTable
-                  title="Needs Review — status not yet classified"
-                  note="Price issue, Scheduled, Revised appt. required, etc. — not run through priority scoring until confirmed how they should be handled."
-                  rows={needsReviewRows}
-                />
-                <PoCharts rows={pendingRows} accentHex={theme.primary} />
-              </div>
-            </details>
-          </>
+          <MarketplaceTabbedView
+            marketplace={marketplace}
+            pendingRows={pendingRows}
+            deliveredRows={deliveredRows}
+            dispatchedRows={dispatchedRows}
+            cancelledRows={cancelledRows}
+            expiredRows={expiredRows}
+            needsReviewRows={needsReviewRows}
+            hasRules={hasRules}
+            demandError={demandError}
+            topSkuData={topSkuData}
+            accentHex={theme.primary}
+          />
         )}
       </div>
     </MarketplaceThemeScope>

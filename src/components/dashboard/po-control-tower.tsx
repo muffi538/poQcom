@@ -134,6 +134,11 @@ interface Props {
   marketplaces: string[]; // distinct marketplaces present — filter hidden when there's only one
   hasRules: boolean;
   demandError?: string | null; // set when the Demand Intelligence sales sheet failed to load — scores below are rules-only
+  // Sets the Priority filter's starting value (e.g. the "Critical" status
+  // tab is a shortcut onto this same table, pre-filtered) — only read on
+  // mount; the dropdown remains fully changeable afterward like any other
+  // filter, this just decides where it starts.
+  initialLevelFilter?: string;
 }
 
 type QuickFilter =
@@ -146,11 +151,11 @@ type QuickFilter =
   | "lowValue"
   | "critical";
 
-export function PoControlTower({ rows, marketplaces, hasRules, demandError }: Props) {
+export function PoControlTower({ rows, marketplaces, hasRules, demandError, initialLevelFilter }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>("priority");
   const [marketplaceFilter, setMarketplaceFilter] = useState<string>("all");
   const [cityFilter, setCityFilter] = useState<string>("all");
-  const [levelFilter, setLevelFilter] = useState<string>("all");
+  const [levelFilter, setLevelFilter] = useState<string>(initialLevelFilter ?? "all");
   const [expiryFilter, setExpiryFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [quickFilters, setQuickFilters] = useState<Set<QuickFilter>>(new Set());
