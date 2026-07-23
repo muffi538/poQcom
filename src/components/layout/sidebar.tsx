@@ -8,6 +8,7 @@ import {
   SlidersHorizontal,
   FlaskConical,
   Settings,
+  RefreshCw,
   ChevronsLeft,
   ChevronsRight,
   type LucideIcon,
@@ -19,6 +20,7 @@ import { ThemeToggle } from "@/components/theme/theme-toggle";
 const staticLinks = [{ href: "/", label: "Overview", icon: LayoutDashboard }];
 const toolLinks = [
   { href: "/rules-builder", label: "Rules Builder", icon: SlidersHorizontal },
+  { href: "/data-sync", label: "Data Sync", icon: RefreshCw },
   { href: "/simulator", label: "Simulator", icon: FlaskConical },
   { href: "/settings", label: "Settings", icon: Settings },
 ];

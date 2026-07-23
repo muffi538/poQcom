@@ -4,7 +4,7 @@ import { cityFromZeptoLocation, cityFromBlinkitFcName, cityFromInstamartFcName }
 import { detectHeaderRow, toNumber } from "./parsing";
 import { ImportLineItem } from "./types";
 
-export type WorkbookType = "po" | "sales" | "dispatch";
+export type WorkbookType = "po" | "sales" | "dispatch" | "ean";
 
 export interface FieldMapping {
   ourField: string;

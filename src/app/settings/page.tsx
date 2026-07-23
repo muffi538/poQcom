@@ -72,9 +72,12 @@ export default async function SettingsPage() {
           </ul>
 
           <p className="mt-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
-            This form is read-only for now — env vars (see <code>.env.example</code>) are the
-            source of truth until it&apos;s decided whether ops users should edit the sheet
-            link/tabs directly in this UI.
+            Superseded — sheet connections now live in Supabase and are managed on the{" "}
+            <a href="/data-sync" className="underline">
+              Data Sync
+            </a>{" "}
+            page, not env vars. This card still reflects the env vars this server process
+            started with.
           </p>
         </div>
 
