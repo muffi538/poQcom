@@ -4,6 +4,8 @@ import { aggregateImportLines } from "./parsing";
 
 export interface ImportPoResult {
   posImported: number;
+  posInserted: number;
+  posUpdated: number;
   itemsImported: number;
   skippedRows: number;
 }
@@ -49,7 +51,7 @@ export async function importPoWorkbookRows(params: {
   }
 
   if (aggregated.length === 0) {
-    return { posImported: 0, itemsImported: 0, skippedRows };
+    return { posImported: 0, posInserted: 0, posUpdated: 0, itemsImported: 0, skippedRows };
   }
 
   console.log(
@@ -58,6 +60,22 @@ export async function importPoWorkbookRows(params: {
       `Delivered: ${aggregated.filter((p) => p.status.trim().toLowerCase() === "delivered").length}, ` +
       `Cancelled: ${aggregated.filter((p) => ["cancel", "cancelled"].includes(p.status.trim().toLowerCase())).length}.`
   );
+
+  // Known-existing po_numbers BEFORE the upsert, so posInserted/posUpdated
+  // can be reported separately — the upsert call itself can't tell insert
+  // from update apart.
+  const { data: existingBefore, error: existingError } = await supabase
+    .from("purchase_orders")
+    .select("po_number")
+    .eq("marketplace_id", marketplaceId)
+    .in(
+      "po_number",
+      aggregated.map((po) => po.poNo)
+    );
+  if (existingError) throw new Error(`Failed to check existing purchase_orders: ${existingError.message}`);
+  const existingPoNumbers = new Set((existingBefore ?? []).map((row) => row.po_number as string));
+  const posInserted = aggregated.filter((po) => !existingPoNumbers.has(po.poNo)).length;
+  const posUpdated = aggregated.length - posInserted;
 
   // Upsert PO headers — idempotent via the (marketplace_id, po_number)
   // unique constraint: re-importing the same sheet/upload updates rows
@@ -117,5 +135,5 @@ export async function importPoWorkbookRows(params: {
     if (insertItemsError) throw new Error(`Failed to insert purchase_order_items: ${insertItemsError.message}`);
   }
 
-  return { posImported: aggregated.length, itemsImported: itemRows.length, skippedRows };
+  return { posImported: aggregated.length, posInserted, posUpdated, itemsImported: itemRows.length, skippedRows };
 }

@@ -45,15 +45,64 @@ function StatusIcon({ status }: { status: string }) {
   return <Circle size={14} className="text-neutral-400" />;
 }
 
+function fmtDuration(ms: number | null): string {
+  if (ms === null) return "—";
+  return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
+}
+
+const JOB_TYPE_BY_WORKBOOK: Record<WorkbookType, string | null> = {
+  po: "po_sync",
+  sales: "sales_sync",
+  dispatch: "dispatch_sync",
+  ean: "ean_sync",
+};
+
+interface ConnectionStatus {
+  lastSync: string | null;
+  syncStatus: string | null;
+  lastSuccess: string | null;
+  lastFailure: string | null;
+  durationMs: number | null;
+  rowsInserted: number | null;
+  rowsUpdated: number | null;
+  rowsFailed: number | null;
+}
+
+// Derives per-workbook status straight from the same sync_jobs history
+// the Sync History table already shows — no separate "current status"
+// column to keep in sync with reality, just a filtered view of one log.
+function getConnectionStatus(syncHistory: SyncJobRow[], workbookType: WorkbookType, marketplaceName: string | null): ConnectionStatus {
+  const jobType = JOB_TYPE_BY_WORKBOOK[workbookType];
+  const matching = syncHistory.filter((j) => j.jobType === jobType && (marketplaceName ? j.marketplaceName === marketplaceName : true));
+  const latest = matching[0] ?? null;
+  const lastSuccessJob = matching.find((j) => j.status === "success") ?? null;
+  const lastFailureJob = matching.find((j) => j.status === "failed") ?? null;
+  return {
+    lastSync: latest?.startedAt ?? null,
+    syncStatus: latest?.status ?? null,
+    lastSuccess: lastSuccessJob?.completedAt ?? null,
+    lastFailure: lastFailureJob?.startedAt ?? null,
+    durationMs: latest?.durationMs ?? null,
+    rowsInserted: latest?.rowsInserted ?? null,
+    rowsUpdated: latest?.rowsUpdated ?? null,
+    rowsFailed: latest?.rowsFailed ?? null,
+  };
+}
+
 function ConnectionRow({
   workbookType,
   marketplace,
   connection,
+  syncHistory,
+  nextRunAt,
 }: {
   workbookType: WorkbookType;
   marketplace: Marketplace | null; // null = shared connection
   connection: SheetConnectionRow | undefined;
+  syncHistory: SyncJobRow[];
+  nextRunAt: string | null;
 }) {
+  const status = getConnectionStatus(syncHistory, workbookType, marketplace?.name ?? null);
   const [sheetUrl, setSheetUrl] = useState(connection?.sheetUrl ?? "");
   const [gid, setGid] = useState(connection?.gid ?? "");
   const [minPoRaisedYear, setMinPoRaisedYear] = useState(connection?.minPoRaisedYear?.toString() ?? "");
@@ -109,7 +158,7 @@ function ConnectionRow({
         }
         setMessage(
           result.status === "success"
-            ? `Synced: ${result.rowsProcessed} processed, ${result.rowsFailed} failed.`
+            ? `Synced: ${result.rowsInserted} inserted, ${result.rowsUpdated} updated, ${result.rowsFailed} failed.`
             : `${result.status}: ${result.errorMessage ?? "unknown error"}`
         );
       } catch (err) {
@@ -167,6 +216,19 @@ function ConnectionRow({
         Manual Sync
       </button>
       {message && <span className="w-full text-xs text-neutral-500">{message}</span>}
+
+      <div className="mt-1 grid w-full grid-cols-2 gap-x-4 gap-y-0.5 text-[11px] text-neutral-500 sm:grid-cols-4">
+        <span className="flex items-center gap-1">
+          {status.syncStatus && <StatusIcon status={status.syncStatus} />} Last Sync: {fmtDate(status.lastSync)}
+        </span>
+        <span>Next Sync: {fmtDate(nextRunAt)}</span>
+        <span>Last Success: {fmtDate(status.lastSuccess)}</span>
+        <span>Last Failure: {fmtDate(status.lastFailure)}</span>
+        <span>Duration: {fmtDuration(status.durationMs)}</span>
+        <span>Rows Imported: {status.rowsInserted ?? "—"}</span>
+        <span>Rows Updated: {status.rowsUpdated ?? "—"}</span>
+        <span>Rows Failed: {status.rowsFailed ?? "—"}</span>
+      </div>
     </div>
   );
 }
@@ -259,6 +321,8 @@ export function DataSyncClient({
                 workbookType={workbookType}
                 marketplace={m}
                 connection={connectionByKey.get(`${workbookType}:${m.id}`)}
+                syncHistory={syncHistory}
+                nextRunAt={autoSyncSettings.nextRunAt}
               />
             ))}
           </div>
@@ -269,7 +333,13 @@ export function DataSyncClient({
         <div key={workbookType} className="glass-card rounded-card p-4 shadow-sm">
           <h2 className="text-sm font-semibold">{WORKBOOK_LABELS[workbookType]}</h2>
           <div className="mt-2">
-            <ConnectionRow workbookType={workbookType} marketplace={null} connection={connectionByKey.get(`${workbookType}:shared`)} />
+            <ConnectionRow
+              workbookType={workbookType}
+              marketplace={null}
+              connection={connectionByKey.get(`${workbookType}:shared`)}
+              syncHistory={syncHistory}
+              nextRunAt={autoSyncSettings.nextRunAt}
+            />
           </div>
         </div>
       ))}
@@ -303,8 +373,10 @@ export function DataSyncClient({
                 <th className="pb-1 pr-3 font-medium">Status</th>
                 <th className="pb-1 pr-3 font-medium">Job</th>
                 <th className="pb-1 pr-3 font-medium">Marketplace</th>
-                <th className="pb-1 pr-3 font-medium">Rows</th>
+                <th className="pb-1 pr-3 font-medium">Inserted</th>
+                <th className="pb-1 pr-3 font-medium">Updated</th>
                 <th className="pb-1 pr-3 font-medium">Failed</th>
+                <th className="pb-1 pr-3 font-medium">Duration</th>
                 <th className="pb-1 font-medium">Started</th>
               </tr>
             </thead>
@@ -316,8 +388,10 @@ export function DataSyncClient({
                   </td>
                   <td className="py-1 pr-3">{j.jobType}</td>
                   <td className="py-1 pr-3">{j.marketplaceName ?? "—"}</td>
-                  <td className="py-1 pr-3 tabular-nums">{j.rowsProcessed}</td>
+                  <td className="py-1 pr-3 tabular-nums">{j.rowsInserted}</td>
+                  <td className="py-1 pr-3 tabular-nums">{j.rowsUpdated}</td>
                   <td className="py-1 pr-3 tabular-nums">{j.rowsFailed}</td>
+                  <td className="py-1 pr-3 tabular-nums">{fmtDuration(j.durationMs)}</td>
                   <td className="py-1 text-neutral-500">{fmtDate(j.startedAt)}</td>
                 </tr>
               ))}

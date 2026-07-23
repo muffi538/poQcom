@@ -100,55 +100,69 @@ export interface SyncJobRow {
   jobType: string;
   marketplaceName: string | null;
   status: string;
-  rowsProcessed: number;
+  rowsInserted: number;
+  rowsUpdated: number;
   rowsFailed: number;
   errorMessage: string | null;
   startedAt: string | null;
   completedAt: string | null;
+  durationMs: number | null;
 }
 
 export async function getSyncHistory(limit = 30): Promise<SyncJobRow[]> {
   const { data, error } = await supabase
     .from("sync_jobs")
-    .select("id, job_type, status, rows_processed, rows_failed, error_message, started_at, completed_at, marketplaces(name)")
+    .select(
+      "id, job_type, status, rows_inserted, rows_updated, rows_failed, error_message, started_at, completed_at, marketplaces(name)"
+    )
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) throw new Error(`Failed to load sync history: ${error.message}`);
-  return (data ?? []).map((row) => ({
-    id: row.id as string,
-    jobType: row.job_type as string,
-    marketplaceName: (row.marketplaces as unknown as { name: string } | null)?.name ?? null,
-    status: row.status as string,
-    rowsProcessed: row.rows_processed as number,
-    rowsFailed: row.rows_failed as number,
-    errorMessage: row.error_message as string | null,
-    startedAt: row.started_at as string | null,
-    completedAt: row.completed_at as string | null,
-  }));
+  return (data ?? []).map((row) => {
+    const startedAt = row.started_at as string | null;
+    const completedAt = row.completed_at as string | null;
+    return {
+      id: row.id as string,
+      jobType: row.job_type as string,
+      marketplaceName: (row.marketplaces as unknown as { name: string } | null)?.name ?? null,
+      status: row.status as string,
+      rowsInserted: row.rows_inserted as number,
+      rowsUpdated: row.rows_updated as number,
+      rowsFailed: row.rows_failed as number,
+      errorMessage: row.error_message as string | null,
+      startedAt,
+      completedAt,
+      durationMs: startedAt && completedAt ? new Date(completedAt).getTime() - new Date(startedAt).getTime() : null,
+    };
+  });
 }
 
 const AUTO_SYNC_ENABLED_KEY = "auto_sync_enabled";
 const AUTO_SYNC_INTERVAL_KEY = "auto_sync_interval_minutes";
+const AUTO_SYNC_LAST_RUN_KEY = "auto_sync_last_run_at";
 
 export interface AutoSyncSettings {
   enabled: boolean;
   intervalMinutes: number;
+  lastRunAt: string | null;
+  nextRunAt: string | null;
 }
 
 export async function getAutoSyncSettings(): Promise<AutoSyncSettings> {
   const { data, error } = await supabase
     .from("settings")
     .select("key, value")
-    .in("key", [AUTO_SYNC_ENABLED_KEY, AUTO_SYNC_INTERVAL_KEY]);
+    .in("key", [AUTO_SYNC_ENABLED_KEY, AUTO_SYNC_INTERVAL_KEY, AUTO_SYNC_LAST_RUN_KEY]);
   if (error) throw new Error(`Failed to load auto-sync settings: ${error.message}`);
   const byKey = new Map((data ?? []).map((row) => [row.key, row.value]));
-  return {
-    enabled: (byKey.get(AUTO_SYNC_ENABLED_KEY) as boolean | undefined) ?? false,
-    intervalMinutes: (byKey.get(AUTO_SYNC_INTERVAL_KEY) as number | undefined) ?? 15,
-  };
+  const enabled = (byKey.get(AUTO_SYNC_ENABLED_KEY) as boolean | undefined) ?? false;
+  const intervalMinutes = (byKey.get(AUTO_SYNC_INTERVAL_KEY) as number | undefined) ?? 15;
+  const lastRunAt = (byKey.get(AUTO_SYNC_LAST_RUN_KEY) as string | null | undefined) ?? null;
+  const nextRunAt = enabled && lastRunAt ? new Date(new Date(lastRunAt).getTime() + intervalMinutes * 60_000).toISOString() : null;
+  return { enabled, intervalMinutes, lastRunAt, nextRunAt };
 }
 
-export async function saveAutoSyncSettings(settings: AutoSyncSettings): Promise<void> {
+export async function saveAutoSyncSettings(settings: { enabled: boolean; intervalMinutes: number }): Promise<void> {
   const { error } = await supabase.from("settings").upsert(
     [
       { key: AUTO_SYNC_ENABLED_KEY, value: settings.enabled, description: "Whether scheduled auto-sync is on." },

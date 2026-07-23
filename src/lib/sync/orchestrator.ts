@@ -15,7 +15,8 @@ export interface SyncResult {
   workbookType: "po" | "sales" | "dispatch";
   marketplaceName: string;
   status: "success" | "failed" | "skipped";
-  rowsProcessed: number;
+  rowsInserted: number;
+  rowsUpdated: number;
   rowsFailed: number;
   errorMessage?: string;
 }
@@ -49,13 +50,15 @@ async function startSyncJob(params: { marketplaceId: string | null; jobType: str
 
 async function finishSyncJob(
   id: string,
-  patch: { status: "success" | "failed"; rowsProcessed: number; rowsFailed: number; errorMessage?: string }
+  patch: { status: "success" | "failed"; rowsInserted: number; rowsUpdated: number; rowsFailed: number; errorMessage?: string }
 ): Promise<void> {
   const { error } = await supabase
     .from("sync_jobs")
     .update({
       status: patch.status,
-      rows_processed: patch.rowsProcessed,
+      rows_processed: patch.rowsInserted + patch.rowsUpdated,
+      rows_inserted: patch.rowsInserted,
+      rows_updated: patch.rowsUpdated,
       rows_failed: patch.rowsFailed,
       error_message: patch.errorMessage ?? null,
       completed_at: new Date().toISOString(),
@@ -73,7 +76,8 @@ export async function syncPoForMarketplace(marketplaceId: string, marketplaceNam
     if (!connection) {
       await finishSyncJob(jobId, {
         status: "failed",
-        rowsProcessed: 0,
+        rowsInserted: 0,
+        rowsUpdated: 0,
         rowsFailed: 0,
         errorMessage: "No PO sheet connection configured for this marketplace yet — add one on the Data Sync page.",
       });
@@ -81,7 +85,8 @@ export async function syncPoForMarketplace(marketplaceId: string, marketplaceNam
         workbookType: "po",
         marketplaceName,
         status: "skipped",
-        rowsProcessed: 0,
+        rowsInserted: 0,
+        rowsUpdated: 0,
         rowsFailed: 0,
         errorMessage: "Not configured",
       };
@@ -106,25 +111,34 @@ export async function syncPoForMarketplace(marketplaceId: string, marketplaceNam
       minPoRaisedYear: connection.minPoRaisedYear ?? undefined,
     });
 
-    await finishSyncJob(jobId, { status: "success", rowsProcessed: result.posImported, rowsFailed: result.skippedRows });
+    await finishSyncJob(jobId, {
+      status: "success",
+      rowsInserted: result.posInserted,
+      rowsUpdated: result.posUpdated,
+      rowsFailed: result.skippedRows,
+    });
     return {
       workbookType: "po",
       marketplaceName,
       status: "success",
-      rowsProcessed: result.posImported,
+      rowsInserted: result.posInserted,
+      rowsUpdated: result.posUpdated,
       rowsFailed: result.skippedRows,
     };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
-    await finishSyncJob(jobId, { status: "failed", rowsProcessed: 0, rowsFailed: 0, errorMessage }).catch(() => {});
-    return { workbookType: "po", marketplaceName, status: "failed", rowsProcessed: 0, rowsFailed: 0, errorMessage };
+    await finishSyncJob(jobId, { status: "failed", rowsInserted: 0, rowsUpdated: 0, rowsFailed: 0, errorMessage }).catch(() => {});
+    return { workbookType: "po", marketplaceName, status: "failed", rowsInserted: 0, rowsUpdated: 0, rowsFailed: 0, errorMessage };
   }
 }
 
 // Sales is one shared tab across every marketplace (a Platform column,
 // not a tab per marketplace) — one sheet_connections row, one sync_jobs +
 // sales_uploads row for the whole sync, one fetch, then
-// importSalesWorkbookRows filters internally per marketplace.
+// importSalesWorkbookRows filters internally per marketplace. Idempotency
+// is a whole-batch replace (clearAllSalesRecords), so every successful
+// sync reports as "inserted", never "updated" — there's nothing to
+// distinguish an update from here.
 export async function syncSales(): Promise<SyncResult> {
   const jobId = await startSyncJob({ marketplaceId: null, jobType: "sales_sync" });
   try {
@@ -132,11 +146,20 @@ export async function syncSales(): Promise<SyncResult> {
     if (!connection) {
       await finishSyncJob(jobId, {
         status: "failed",
-        rowsProcessed: 0,
+        rowsInserted: 0,
+        rowsUpdated: 0,
         rowsFailed: 0,
         errorMessage: "No Sales sheet connection configured yet — add one on the Data Sync page.",
       });
-      return { workbookType: "sales", marketplaceName: "all", status: "skipped", rowsProcessed: 0, rowsFailed: 0, errorMessage: "Not configured" };
+      return {
+        workbookType: "sales",
+        marketplaceName: "all",
+        status: "skipped",
+        rowsInserted: 0,
+        rowsUpdated: 0,
+        rowsFailed: 0,
+        errorMessage: "Not configured",
+      };
     }
 
     const rawRows = await readRawRowsFromSheetUrl(connection.sheetUrl, connection.gid);
@@ -164,19 +187,19 @@ export async function syncSales(): Promise<SyncResult> {
       totalImported += result.recordsImported;
     }
 
-    await finishSyncJob(jobId, { status: "success", rowsProcessed: totalImported, rowsFailed: 0 });
-    return { workbookType: "sales", marketplaceName: "all", status: "success", rowsProcessed: totalImported, rowsFailed: 0 };
+    await finishSyncJob(jobId, { status: "success", rowsInserted: totalImported, rowsUpdated: 0, rowsFailed: 0 });
+    return { workbookType: "sales", marketplaceName: "all", status: "success", rowsInserted: totalImported, rowsUpdated: 0, rowsFailed: 0 };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
-    await finishSyncJob(jobId, { status: "failed", rowsProcessed: 0, rowsFailed: 0, errorMessage }).catch(() => {});
-    return { workbookType: "sales", marketplaceName: "all", status: "failed", rowsProcessed: 0, rowsFailed: 0, errorMessage };
+    await finishSyncJob(jobId, { status: "failed", rowsInserted: 0, rowsUpdated: 0, rowsFailed: 0, errorMessage }).catch(() => {});
+    return { workbookType: "sales", marketplaceName: "all", status: "failed", rowsInserted: 0, rowsUpdated: 0, rowsFailed: 0, errorMessage };
   }
 }
 
 // Dispatch is also one shared tab (Marketplace column) — same shape as
-// Sales, but it only UPDATES existing purchase_orders, so there's no
-// dispatch_uploads table (nothing new is created that a row could belong
-// to) — sync_jobs alone carries its history.
+// Sales, but it only UPDATES existing purchase_orders (never inserts), so
+// there's no dispatch_uploads table — sync_jobs alone carries its
+// history, and every successful row is an "update", never an "insert".
 export async function syncDispatch(): Promise<SyncResult> {
   const jobId = await startSyncJob({ marketplaceId: null, jobType: "dispatch_sync" });
   try {
@@ -184,11 +207,20 @@ export async function syncDispatch(): Promise<SyncResult> {
     if (!connection) {
       await finishSyncJob(jobId, {
         status: "failed",
-        rowsProcessed: 0,
+        rowsInserted: 0,
+        rowsUpdated: 0,
         rowsFailed: 0,
-        errorMessage: "No Dispatch sheet connection configured yet — add one on the Data Sync page (or use Manual Excel upload).",
+        errorMessage: "No Dispatch sheet connection configured yet — add one on the Data Sync page.",
       });
-      return { workbookType: "dispatch", marketplaceName: "all", status: "skipped", rowsProcessed: 0, rowsFailed: 0, errorMessage: "Not configured" };
+      return {
+        workbookType: "dispatch",
+        marketplaceName: "all",
+        status: "skipped",
+        rowsInserted: 0,
+        rowsUpdated: 0,
+        rowsFailed: 0,
+        errorMessage: "Not configured",
+      };
     }
 
     const rawRows = await readRawRowsFromSheetUrl(connection.sheetUrl, connection.gid);
@@ -206,12 +238,12 @@ export async function syncDispatch(): Promise<SyncResult> {
       totalNotFound += result.posNotFound;
     }
 
-    await finishSyncJob(jobId, { status: "success", rowsProcessed: totalUpdated, rowsFailed: totalNotFound });
-    return { workbookType: "dispatch", marketplaceName: "all", status: "success", rowsProcessed: totalUpdated, rowsFailed: totalNotFound };
+    await finishSyncJob(jobId, { status: "success", rowsInserted: 0, rowsUpdated: totalUpdated, rowsFailed: totalNotFound });
+    return { workbookType: "dispatch", marketplaceName: "all", status: "success", rowsInserted: 0, rowsUpdated: totalUpdated, rowsFailed: totalNotFound };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
-    await finishSyncJob(jobId, { status: "failed", rowsProcessed: 0, rowsFailed: 0, errorMessage }).catch(() => {});
-    return { workbookType: "dispatch", marketplaceName: "all", status: "failed", rowsProcessed: 0, rowsFailed: 0, errorMessage };
+    await finishSyncJob(jobId, { status: "failed", rowsInserted: 0, rowsUpdated: 0, rowsFailed: 0, errorMessage }).catch(() => {});
+    return { workbookType: "dispatch", marketplaceName: "all", status: "failed", rowsInserted: 0, rowsUpdated: 0, rowsFailed: 0, errorMessage };
   }
 }
 
