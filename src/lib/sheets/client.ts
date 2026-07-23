@@ -45,6 +45,26 @@ export async function readSheetTabRaw(gid: string, sheetIdOverride?: string): Pr
   return parseCsv(text).map((row) => row.map((cell) => cell.trim()));
 }
 
+// DB-driven equivalent of readSheetTabRaw — takes the sheet URL directly
+// (from a sheet_connections row) instead of resolving it from an env var,
+// and gid is optional (a single-tab workbook, e.g. the Sales sheet,
+// exports its one sheet when gid is omitted).
+export async function readRawRowsFromSheetUrl(sheetUrl: string, gid?: string | null): Promise<string[][]> {
+  const sheetId = extractSheetId(sheetUrl);
+  const url = gid
+    ? `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`
+    : `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) {
+    throw new Error(
+      `Failed to read sheet (${sheetUrl}${gid ? `, gid=${gid}` : ""}): HTTP ${res.status}. Confirm it's shared as "Anyone with the link can view".`
+    );
+  }
+
+  const text = await res.text();
+  return parseCsv(text).map((row) => row.map((cell) => cell.trim()));
+}
+
 // Fetches one tab as an array of row objects keyed by the given header
 // row. `headerRowIndex` accounts for cosmetic title/notice rows Google
 // Sheets users often put above the real header (0-indexed). Do not use
