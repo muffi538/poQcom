@@ -31,12 +31,27 @@ const qty = (po: PurchaseOrder) => po.orderedQty.toLocaleString("en-IN");
 const VARIANT_COLUMNS: Record<OperationalVariant, ColumnDef[]> = {
   dispatched: [
     { key: "po", label: "PO Number", width: 130, render: (po) => po.id, csv: (po) => po.id },
+    { key: "city", label: "City", width: 90, render: (po) => po.city || "—", csv: (po) => po.city },
+    { key: "dispatcher", label: "Dispatcher", width: 110, render: (po) => po.dispatcherName ?? "—", csv: (po) => po.dispatcherName },
+    { key: "dispatchedFrom", label: "Dispatched From", width: 110, render: (po) => po.dispatchedFrom ?? "—", csv: (po) => po.dispatchedFrom },
     { key: "dispatchDate", label: "Dispatch Date", width: 100, render: (po) => fmtDate(po.dispatchDate), csv: (po) => po.dispatchDate },
+    {
+      key: "fulfilmentDays",
+      label: "Fulfilment Days",
+      width: 90,
+      render: (po) => (po.fulfilmentDays === null ? "—" : `${po.fulfilmentDays}d`),
+      csv: (po) => po.fulfilmentDays,
+    },
     { key: "qty", label: "Qty", width: 70, render: qty, csv: (po) => po.orderedQty },
-    { key: "dispatcher", label: "Dispatcher", width: 120, render: (po) => po.dispatcherName ?? "—", csv: (po) => po.dispatcherName },
-    { key: "shipmentId", label: "Shipment ID", width: 100, render: () => "—", csv: () => null },
+    {
+      key: "fillRate",
+      label: "Fill Rate %",
+      width: 80,
+      render: (po) => (po.fillRate === null ? "—" : `${po.fillRate}%`),
+      csv: (po) => po.fillRate,
+    },
+    { key: "shipmentId", label: "Shipment ID", width: 110, render: (po) => po.shipmentId ?? "—", csv: (po) => po.shipmentId },
     { key: "fc", label: "FC", width: 140, render: (po) => po.warehouse || "—", csv: (po) => po.warehouse },
-    { key: "city", label: "City", width: 100, render: (po) => po.city || "—", csv: (po) => po.city },
     { key: "products", label: "Products", width: 220, render: products, csv: products },
   ],
   in_transit: [
@@ -68,6 +83,25 @@ const VARIANT_COLUMNS: Record<OperationalVariant, ColumnDef[]> = {
     { key: "reason", label: "Reason", width: 160, render: () => "—", csv: () => null },
   ],
 };
+
+// Only the Dispatched variant gets the Dispatch-workbook extra fields —
+// the same stored (never recomputed) columns the Delivered workflow
+// shows, since a PO already reaches Dispatched the moment the Dispatch
+// workbook has a record for it. The other four variants (In Transit,
+// Scheduled, Cancelled, Low Value) keep the base fields only, unchanged.
+function dispatchedExtraFields(po: PurchaseOrder) {
+  return [
+    { label: "Fulfilment Days", value: po.fulfilmentDays === null ? "—" : `${po.fulfilmentDays}d` },
+    { label: "Fill Rate", value: po.fillRate === null ? "—" : `${po.fillRate}%` },
+    { label: "Dispatcher", value: po.dispatcherName ?? "—" },
+    { label: "Dispatched From", value: po.dispatchedFrom ?? "—" },
+    { label: "Driver", value: po.driverName ?? "—" },
+    { label: "Appointment Qty", value: po.appointmentQty === null ? "—" : po.appointmentQty.toLocaleString("en-IN") },
+    { label: "Shipment ID", value: po.shipmentId ?? "—" },
+    { label: "Invoice", value: po.invoice === null ? "—" : po.invoice ? "Yes" : "No" },
+    { label: "MRP Label", value: po.mrpLabel === null ? "—" : po.mrpLabel ? "Yes" : "No" },
+  ];
+}
 
 const inputClasses =
   "rounded-lg border border-frido-border bg-white px-2 py-1 text-xs shadow-sm outline-none transition-colors focus:border-[var(--mp-accent)] dark:border-white/10 dark:bg-neutral-900";
@@ -192,7 +226,13 @@ export function OperationalPoTable({
           </div>
         )}
       </div>
-      {selected && <WorkflowDetailPanel po={selected} onClose={() => setSelected(null)} />}
+      {selected && (
+        <WorkflowDetailPanel
+          po={selected}
+          extraFields={variant === "dispatched" ? dispatchedExtraFields(selected) : []}
+          onClose={() => setSelected(null)}
+        />
+      )}
     </div>
   );
 }
