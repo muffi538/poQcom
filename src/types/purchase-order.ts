@@ -41,13 +41,19 @@ export interface PurchaseOrder {
 
   // Dispatch workbook fields (Supabase-only — null for any PO the
   // Dispatch sync hasn't matched yet, which is every PO before its
-  // first dispatch update, not an error).
+  // first dispatch update, not an error). All of these are written ONCE
+  // by the Dispatch importer at sync time (src/lib/import/dispatch-importer.ts)
+  // — the UI only ever reads them, it never recomputes any of them.
   fillRate: number | null; // (Dispatched Qty / Appt Qty) × 100, from the Dispatch sheet's own numbers
   dispatcherName: string | null;
   driverName: string | null; // from the Dispatch workbook, when mapped — null otherwise, never fabricated
   dispatchedFrom: string | null; // Dispatch workbook's own "Dispatched from" location — distinct from `warehouse` (the Shipment Tracker's FC)
-  dispatchApptQty: number | null; // Dispatch workbook's own "Appt Quantity" — distinct from `orderedQty` (owned by the PO workbook)
-  operationalDispatchDays: number | null; // Dispatch Date − this PO's own PO Raised Date
+  appointmentQty: number | null; // Dispatch workbook's own "Appt Quantity" — distinct from `orderedQty` (owned by the PO workbook)
+  fulfilmentDays: number | null; // Dispatch Date − this PO's own PO Raised Date, computed and stored by the importer
+  shipmentId: string | null; // Dispatch workbook's own "PO/Shipment ID" cell, stored verbatim for audit (also the join key against `id`)
+  consignmentId: string | null; // reserved for a Consignment ID column — the real workbook has none today, so this stays null, never derived/fabricated
+  invoice: boolean | null; // Dispatch workbook's Document Checklist "Invoice" column
+  mrpLabel: boolean | null; // Dispatch workbook's Document Checklist "MRP Lablel" column
 
   raw: Record<string, unknown>; // untouched source row, for debugging/audit
 }

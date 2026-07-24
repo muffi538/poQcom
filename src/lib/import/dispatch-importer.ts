@@ -3,9 +3,19 @@ import { loadFieldMappings, extractRowsByHeader } from "./field-mappings";
 import { toNumber } from "./parsing";
 import { parseSheetDateDayFirst, daysBetween } from "@/lib/po/dates";
 
+export type UnmatchedReason =
+  | "missing_dispatch_record" // PO missing from Dispatch Workbook entirely
+  | "marketplace_mismatch" // present, but tagged under a different Marketplace
+  | "duplicate_po" // appears more than once in the sheet under this marketplace
+  | "case_mismatch" // present, differs from our po_number only by letter case
+  | "trailing_spaces" // present, differs only by leading/trailing whitespace
+  | "hidden_characters" // present, differs only by zero-width/BOM/NBSP characters
+  | "formatting_mismatch"; // present and tagged correctly, but still didn't match — needs manual review
+
 export interface UnmatchedDeliveredPo {
   poNumber: string;
-  reason: "missing_dispatch_record" | "marketplace_mismatch" | "formatting_mismatch" | "duplicate_po";
+  marketplace: string;
+  reason: UnmatchedReason;
   detail: string;
 }
 
@@ -15,15 +25,29 @@ export interface ImportDispatchResult {
   unmatchedDeliveredPos: UnmatchedDeliveredPo[];
 }
 
+const HIDDEN_CHAR_PATTERN = /[\u200B-\u200D\uFEFF\u00A0]/;
+
 // Strips characters that read as blank/identical to a human but break a
 // strict string match: zero-width space/joiner/non-joiner (U+200B-200D),
 // BOM (U+FEFF), and non-breaking space (U+00A0) — all of which Google
 // Sheets exports have been seen to leave behind on pasted PO numbers.
-// Confirmed need: this is exactly the kind of "formatting mismatch" this
-// importer must rule out before ever concluding a PO's dispatch record
-// is genuinely missing.
-function normalizeMatchKey(value: string): string {
-  return value.replace(/[\u200B-\u200D\uFEFF\u00A0]/g, "").trim();
+// Matching is also case-insensitive (see buildKey) — PO/Shipment IDs
+// carry no case-sensitive meaning, so a stray case difference between
+// the Shipment Tracker and the Dispatch workbook must not cause a real
+// dispatch record to go unmatched.
+function stripHidden(value: string): string {
+  return value.replace(HIDDEN_CHAR_PATTERN, "").trim();
+}
+
+function buildKey(value: string): string {
+  return stripHidden(value).toUpperCase();
+}
+
+function parseChecklistBool(value: string): boolean | null {
+  const v = value.trim().toUpperCase();
+  if (v === "TRUE") return true;
+  if (v === "FALSE") return false;
+  return null; // blank/unrecognized — never fabricated
 }
 
 // The Dispatch workbook ("MP Dispatched Consignment Checklist") is a
@@ -44,24 +68,38 @@ function normalizeMatchKey(value: string): string {
 // sync. This importer is enrichment-only against whatever status the PO
 // already has.
 //
-// Confirmed with the user (2026-07-23) against the real workbook, which
-// has no Status/PO Date/City/SKU columns, and whose Dispatched Date
-// column is d/m/yyyy (this sheet's own locale) — unlike every PO/Sales
-// sheet, which is m/d/yyyy, so it needs parseSheetDateDayFirst, not
-// parseSheetDate:
-//   - operational_dispatch_days = this sheet's Dispatch Date minus the
-//     PO's own po_raised_date already in Supabase (from the PO workbook),
-//     since the sheet has no PO Date column of its own.
+// Architectural rule (2026-07-24, replacing the old "copy a few fields,
+// patch the UI to compute the rest" approach): EVERY field the Dispatch
+// workbook carries for a matched consignment is written here, once, at
+// sync time — dispatch_date, dispatcher_name, dispatched_from,
+// appointment_qty, dispatched_qty, fill_rate, shipment_id, invoice,
+// mrp_label, and fulfilment_days (computed here, never in the UI). The
+// UI's only job is to read these columns.
+//
+// Confirmed against the real workbook, which has no Status/PO Date/City/
+// SKU columns, and whose Dispatched Date column is d/m/yyyy (this
+// sheet's own locale) — unlike every PO/Sales sheet, which is m/d/yyyy,
+// so it needs parseSheetDateDayFirst, not parseSheetDate:
+//   - fulfilment_days = this sheet's Dispatch Date minus the PO's own
+//     po_raised_date already in Supabase (from the PO workbook), since
+//     the sheet has no PO Date column of its own.
 //   - fill_rate is computed from this sheet's own Dispatched Qty / Appt
 //     Qty (mapped as "ordered_qty" here — used only for this calculation,
 //     never written to purchase_orders.ordered_qty, which stays owned by
 //     the PO workbook) rather than trusting the sheet's own "Fill Rate
-//     (%)" display column. dispatch_appt_qty persists that same Appt
-//     Quantity as its own field so the Delivered drawer can show it
-//     without pretending it's the PO's own ordered_qty.
-//   - driver_name/dispatched_from enrich the same way as dispatcher_name
-//     when the marketplace's mapping includes those columns; null when
-//     it doesn't (graceful, never fabricated).
+//     (%)" display column. appointment_qty persists that same Appt
+//     Quantity as its own field so the Delivered drawer/table can show
+//     it without pretending it's the PO's own ordered_qty.
+//   - shipment_id stores the sheet's "PO/Shipment ID" cell verbatim
+//     (pre-normalization) for audit, even though it's also the join key.
+//     consignment_id has no source column in the real workbook today and
+//     is intentionally never written (stays null — not derived from
+//     shipment_id/po_number, per "never invent values").
+//   - invoice/mrp_label mirror the sheet's own Document Checklist
+//     TRUE/FALSE columns; null when the cell is blank/unrecognized.
+//   - driver_name enriches the same way as dispatcher_name when the
+//     marketplace's mapping includes a "driver" column; null otherwise
+//     (no marketplace maps one today — graceful, not fabricated).
 export async function importDispatchWorkbookRows(params: {
   marketplaceId: string;
   marketplaceName: string;
@@ -70,7 +108,26 @@ export async function importDispatchWorkbookRows(params: {
   const { marketplaceId, marketplaceName, rawRows } = params;
 
   const mappings = await loadFieldMappings(marketplaceId, "dispatch");
-  const rowsByHeader = extractRowsByHeader(rawRows, mappings, marketplaceName);
+  // Confirmed against the real "MP Dispatched Consignment Checklist"
+  // (2026-07-24): its header spans TWO rows — row 1 has group labels
+  // ("Document Checklist", "Courier Detail") that, in the CSV export,
+  // land in the SAME column as the group's first sub-column (e.g.
+  // "Document Checklist" sits in the same cell "Invoice" occupies one
+  // row down — a merged spreadsheet cell only ever exports its text into
+  // its top-left column). detectHeaderRow (via extractRowsByHeader) only
+  // ever reads one row, so without this merge those sub-columns are
+  // silently unreachable by name — every "invoice"/"mrp_label" mapping
+  // would resolve to nothing, or worse, silently collide with the group
+  // label. Row 2 (the real per-column names) wins whenever it has text;
+  // row 1 only fills the columns row 2 leaves blank (Dispatched Date,
+  // PO/Shipment ID, Marketplace, ... — every column that has no sub-
+  // header at all). This doesn't touch extractRowsByHeader itself, which
+  // the PO/Sales/EAN importers also use and don't have this quirk.
+  const headerRow1 = rawRows[0] ?? [];
+  const headerRow2 = rawRows[1] ?? [];
+  const mergedHeader = headerRow1.map((cell, i) => (headerRow2[i]?.trim() ? headerRow2[i] : cell ?? ""));
+  const mergedRawRows = rawRows.length > 1 ? [mergedHeader, ...rawRows.slice(2)] : rawRows;
+  const rowsByHeader = extractRowsByHeader(mergedRawRows, mappings, marketplaceName);
 
   const byField = new Map(mappings.map((m) => [m.ourField, m.sheetColumnName]));
   const get = (row: Record<string, string>, field: string): string => {
@@ -79,24 +136,29 @@ export async function importDispatchWorkbookRows(params: {
   };
 
   // Index of every po_number in the WHOLE sheet (every marketplace, not
-  // just this call's), keyed by normalized po number → the set of raw
-  // Marketplace tags it appears under. Built once per call so the
-  // post-pass below can tell "genuinely absent from the Dispatch
-  // workbook" apart from "present, but tagged under a different
-  // marketplace" without a second sheet fetch.
+  // just this call's), keyed by the match key → the set of raw
+  // Marketplace tags it appears under, plus the raw (un-normalized) sheet
+  // cell values seen for it. Built once per call so the post-pass below
+  // can tell "genuinely absent from the Dispatch workbook" apart from
+  // "present, but tagged under a different marketplace" and give a
+  // precise formatting diagnosis, without a second sheet fetch.
   const hasMarketplaceMapping = byField.has("marketplace");
   const sheetPoMarketplaceTags = new Map<string, Set<string>>();
   const sheetPoOccurrences = new Map<string, number>();
+  const sheetRawValuesByKey = new Map<string, Set<string>>();
   for (const row of rowsByHeader) {
     const rawPoNo = get(row, "po_number");
-    const poNo = normalizeMatchKey(rawPoNo);
-    if (!poNo) continue;
-    sheetPoOccurrences.set(poNo, (sheetPoOccurrences.get(poNo) ?? 0) + 1);
+    const key = buildKey(rawPoNo);
+    if (!key) continue;
+    sheetPoOccurrences.set(key, (sheetPoOccurrences.get(key) ?? 0) + 1);
+    const rawValues = sheetRawValuesByKey.get(key) ?? new Set<string>();
+    rawValues.add(rawPoNo);
+    sheetRawValuesByKey.set(key, rawValues);
     if (hasMarketplaceMapping) {
       const tag = get(row, "marketplace").trim();
-      const tags = sheetPoMarketplaceTags.get(poNo) ?? new Set<string>();
+      const tags = sheetPoMarketplaceTags.get(key) ?? new Set<string>();
       tags.add(tag || "(blank)");
-      sheetPoMarketplaceTags.set(poNo, tags);
+      sheetPoMarketplaceTags.set(key, tags);
     }
   }
 
@@ -110,75 +172,68 @@ export async function importDispatchWorkbookRows(params: {
     : rowsByHeader;
 
   const lines = relevantRows.map((row) => ({
-    poNo: normalizeMatchKey(get(row, "po_number")),
+    poKey: buildKey(get(row, "po_number")),
+    shipmentId: get(row, "po_number").trim() || null,
     dispatchDate: parseSheetDateDayFirst(get(row, "dispatch_date")),
     dispatchedQty: toNumber(get(row, "dispatched_qty")),
     apptQty: toNumber(get(row, "ordered_qty")),
     dispatcherName: get(row, "dispatcher_name") || null,
     driverName: get(row, "driver") || null,
     dispatchedFrom: get(row, "dispatched_from") || null,
+    invoice: byField.has("invoice") ? parseChecklistBool(get(row, "invoice")) : null,
+    mrpLabel: byField.has("mrp_label") ? parseChecklistBool(get(row, "mrp_label")) : null,
   }));
 
-  const byPoNo = new Map<string, typeof lines>();
-  let lastPoNo = "";
+  const byPoKey = new Map<string, typeof lines>();
+  let lastPoKey = "";
   for (const line of lines) {
-    const poNo = line.poNo || lastPoNo;
-    if (!poNo) continue;
-    lastPoNo = poNo;
-    const group = byPoNo.get(poNo) ?? [];
+    const key = line.poKey || lastPoKey;
+    if (!key) continue;
+    lastPoKey = key;
+    const group = byPoKey.get(key) ?? [];
     group.push(line);
-    byPoNo.set(poNo, group);
+    byPoKey.set(key, group);
   }
 
-  const poNumbers = Array.from(byPoNo.keys());
   const unmatchedDeliveredPos: UnmatchedDeliveredPo[] = [];
 
   // Fetch every currently-Delivered PO for this marketplace regardless of
   // whether the sheet mentions it — this is what lets the diagnostic
   // pass below reason about POs the sheet never touches at all, not just
-  // ones this run happened to see.
-  const { data: deliveredPos, error: deliveredError } = await supabase
-    .from("purchase_orders")
-    .select("po_number, dispatcher_name")
-    .eq("marketplace_id", marketplaceId)
-    .ilike("status", "delivered");
+  // ones this run happened to see. Also fetch every PO at all (not just
+  // Delivered) for the actual match/update pass — a plain marketplace-
+  // scoped fetch, rather than `.in("po_number", ...)`, so a stray case/
+  // whitespace difference in the DB's own po_number can never cause a
+  // real match to be silently skipped by the filter itself.
+  const [{ data: deliveredPos, error: deliveredError }, { data: allPos, error: allPosError }] = await Promise.all([
+    supabase.from("purchase_orders").select("po_number, dispatcher_name").eq("marketplace_id", marketplaceId).ilike("status", "delivered"),
+    supabase.from("purchase_orders").select("id, po_number, po_raised_date").eq("marketplace_id", marketplaceId),
+  ]);
   if (deliveredError) throw new Error(`Failed to load Delivered POs for dispatch diagnostics: ${deliveredError.message}`);
+  if (allPosError) throw new Error(`Failed to look up purchase_orders for dispatch update: ${allPosError.message}`);
 
-  if (poNumbers.length === 0) {
-    for (const po of deliveredPos ?? []) {
-      if (po.dispatcher_name) continue; // already enriched by a previous run
-      unmatchedDeliveredPos.push(diagnoseUnmatched(po.po_number as string, sheetPoMarketplaceTags, sheetPoOccurrences, marketplaceName, false));
-    }
-    logDiagnostics(marketplaceName, unmatchedDeliveredPos);
-    return { posUpdated: 0, posNotFound: 0, unmatchedDeliveredPos };
-  }
-
-  const { data: existingPos, error: fetchError } = await supabase
-    .from("purchase_orders")
-    .select("id, po_number, po_raised_date")
-    .eq("marketplace_id", marketplaceId)
-    .in("po_number", poNumbers);
-  if (fetchError) throw new Error(`Failed to look up purchase_orders for dispatch update: ${fetchError.message}`);
-
-  const existingByPoNo = new Map((existingPos ?? []).map((row) => [normalizeMatchKey(row.po_number as string), row]));
+  const existingByPoKey = new Map((allPos ?? []).map((row) => [buildKey(row.po_number as string), row]));
 
   let posUpdated = 0;
   let posNotFound = 0;
-  const touchedPoNumbers = new Set<string>();
+  const touchedPoKeys = new Set<string>();
 
-  for (const [poNo, group] of byPoNo) {
-    const existing = existingByPoNo.get(poNo);
+  for (const [poKey, group] of byPoKey) {
+    const existing = existingByPoKey.get(poKey);
     if (!existing) {
-      console.warn(`[${marketplaceName}] Dispatch update skipped: PO ${poNo} not found in purchase_orders.`);
+      console.warn(`[${marketplaceName}] Dispatch update skipped: PO ${group[0]?.shipmentId ?? poKey} not found in purchase_orders.`);
       posNotFound++;
       continue;
     }
-    touchedPoNumbers.add(poNo);
+    touchedPoKeys.add(poKey);
 
     const dispatchDate = group.map((l) => l.dispatchDate).find((v) => v) ?? null;
     const dispatcherName = group.map((l) => l.dispatcherName).find((v) => v) ?? null;
     const driverName = group.map((l) => l.driverName).find((v) => v) ?? null;
     const dispatchedFrom = group.map((l) => l.dispatchedFrom).find((v) => v) ?? null;
+    const shipmentId = group.map((l) => l.shipmentId).find((v) => v) ?? null;
+    const invoice = group.map((l) => l.invoice).find((v) => v !== null) ?? null;
+    const mrpLabel = group.map((l) => l.mrpLabel).find((v) => v !== null) ?? null;
     let dispatchedQty = 0;
     let apptQty = 0;
     for (const line of group) {
@@ -187,24 +242,28 @@ export async function importDispatchWorkbookRows(params: {
     }
 
     const fillRate = apptQty > 0 ? (dispatchedQty / apptQty) * 100 : null;
-    const operationalDispatchDays =
-      dispatchDate && existing.po_raised_date ? daysBetween(existing.po_raised_date, dispatchDate) : null;
+    const fulfilmentDays = dispatchDate && existing.po_raised_date ? daysBetween(existing.po_raised_date, dispatchDate) : null;
 
     // Enrichment-only — never touches `status` (Golden Rule #1/#4:
-    // Shipment Tracker alone owns Status).
+    // Shipment Tracker alone owns Status). Every field the sheet gives us
+    // for this consignment is written here, once — the UI never
+    // recomputes any of it.
     const update: Record<string, unknown> = {};
     if (dispatchDate) update.dispatch_date = dispatchDate;
     update.dispatched_qty = dispatchedQty;
     if (fillRate !== null) update.fill_rate = Math.round(fillRate * 100) / 100;
-    if (apptQty > 0) update.dispatch_appt_qty = apptQty;
+    if (apptQty > 0) update.appointment_qty = apptQty;
     if (dispatcherName) update.dispatcher_name = dispatcherName;
     if (driverName) update.driver_name = driverName;
     if (dispatchedFrom) update.dispatched_from = dispatchedFrom;
-    if (operationalDispatchDays !== null) update.operational_dispatch_days = operationalDispatchDays;
+    if (shipmentId) update.shipment_id = shipmentId;
+    if (invoice !== null) update.invoice = invoice;
+    if (mrpLabel !== null) update.mrp_label = mrpLabel;
+    if (fulfilmentDays !== null) update.fulfilment_days = fulfilmentDays;
     if (Object.keys(update).length === 0) continue;
 
     const { error: updateError } = await supabase.from("purchase_orders").update(update).eq("id", existing.id);
-    if (updateError) throw new Error(`Failed to update purchase_orders for PO ${poNo}: ${updateError.message}`);
+    if (updateError) throw new Error(`Failed to update purchase_orders for PO ${shipmentId ?? poKey}: ${updateError.message}`);
     posUpdated++;
   }
 
@@ -213,10 +272,12 @@ export async function importDispatchWorkbookRows(params: {
   // sheet does but the fields were already filled by an earlier run —
   // classify exactly why, rather than leaving it as an unexplained blank.
   for (const po of deliveredPos ?? []) {
-    const poNo = normalizeMatchKey(po.po_number as string);
-    if (touchedPoNumbers.has(poNo)) continue; // enriched just now
+    const poKey = buildKey(po.po_number as string);
+    if (touchedPoKeys.has(poKey)) continue; // enriched just now
     if (po.dispatcher_name) continue; // already enriched by a previous run
-    unmatchedDeliveredPos.push(diagnoseUnmatched(po.po_number as string, sheetPoMarketplaceTags, sheetPoOccurrences, marketplaceName, hasMarketplaceMapping));
+    unmatchedDeliveredPos.push(
+      diagnoseUnmatched(po.po_number as string, marketplaceName, sheetPoMarketplaceTags, sheetPoOccurrences, sheetRawValuesByKey, hasMarketplaceMapping)
+    );
   }
   logDiagnostics(marketplaceName, unmatchedDeliveredPos);
 
@@ -226,21 +287,29 @@ export async function importDispatchWorkbookRows(params: {
 
 function diagnoseUnmatched(
   rawPoNumber: string,
+  marketplaceName: string,
   sheetPoMarketplaceTags: Map<string, Set<string>>,
   sheetPoOccurrences: Map<string, number>,
-  marketplaceName: string,
+  sheetRawValuesByKey: Map<string, Set<string>>,
   hasMarketplaceMapping: boolean
 ): UnmatchedDeliveredPo {
-  const poNo = normalizeMatchKey(rawPoNumber);
-  const occurrences = sheetPoOccurrences.get(poNo) ?? 0;
-  const tags = sheetPoMarketplaceTags.get(poNo);
+  const key = buildKey(rawPoNumber);
+  const occurrences = sheetPoOccurrences.get(key) ?? 0;
+  const tags = sheetPoMarketplaceTags.get(key);
+  const rawSheetValues = sheetRawValuesByKey.get(key);
 
   if (occurrences === 0) {
-    return { poNumber: rawPoNumber, reason: "missing_dispatch_record", detail: "Not present anywhere in the Dispatch workbook." };
+    return {
+      poNumber: rawPoNumber,
+      marketplace: marketplaceName,
+      reason: "missing_dispatch_record",
+      detail: "PO missing from Dispatch Workbook — not present anywhere in the sheet.",
+    };
   }
   if (hasMarketplaceMapping && tags && !tags.has(marketplaceName)) {
     return {
       poNumber: rawPoNumber,
+      marketplace: marketplaceName,
       reason: "marketplace_mismatch",
       detail: `Present in the sheet, but tagged as Marketplace = ${[...tags].join(", ")}, not "${marketplaceName}".`,
     };
@@ -248,18 +317,51 @@ function diagnoseUnmatched(
   if (occurrences > 1) {
     return {
       poNumber: rawPoNumber,
+      marketplace: marketplaceName,
       reason: "duplicate_po",
-      detail: `Appears ${occurrences} times in the Dispatch workbook under this marketplace — check for conflicting rows.`,
+      detail: `Duplicate PO — appears ${occurrences} times in the Dispatch workbook under this marketplace.`,
     };
   }
-  // Present, correctly tagged, appears exactly once, yet still didn't
-  // update — the only remaining explanation is a residual formatting
-  // difference normalizeMatchKey doesn't strip (e.g. a different
-  // invisible character, or the PO number embedded with extra text).
+
+  // Present, correctly tagged, appears exactly once, and yet still
+  // wasn't matched by buildKey (which already strips hidden characters,
+  // trims, and upper-cases) — this branch should be unreachable in
+  // practice, since buildKey is applied identically on both the sheet
+  // and DB sides before comparison. If it's ever hit, compare the raw
+  // strings directly to name the most likely residual cause rather than
+  // a bare "investigate manually".
+  const sheetRaw = rawSheetValues ? [...rawSheetValues][0] : "";
+  if (sheetRaw) {
+    if (sheetRaw !== sheetRaw.trim() || rawPoNumber !== rawPoNumber.trim()) {
+      return {
+        poNumber: rawPoNumber,
+        marketplace: marketplaceName,
+        reason: "trailing_spaces",
+        detail: `Present in the sheet as "${sheetRaw}" — differs from "${rawPoNumber}" by leading/trailing whitespace.`,
+      };
+    }
+    if (HIDDEN_CHAR_PATTERN.test(sheetRaw) || HIDDEN_CHAR_PATTERN.test(rawPoNumber)) {
+      return {
+        poNumber: rawPoNumber,
+        marketplace: marketplaceName,
+        reason: "hidden_characters",
+        detail: `Present in the sheet as "${sheetRaw}" — contains hidden/invisible characters not visible in either value.`,
+      };
+    }
+    if (sheetRaw.toUpperCase() === rawPoNumber.toUpperCase() && sheetRaw !== rawPoNumber) {
+      return {
+        poNumber: rawPoNumber,
+        marketplace: marketplaceName,
+        reason: "case_mismatch",
+        detail: `Present in the sheet as "${sheetRaw}" — differs from "${rawPoNumber}" only by letter case.`,
+      };
+    }
+  }
   return {
     poNumber: rawPoNumber,
+    marketplace: marketplaceName,
     reason: "formatting_mismatch",
-    detail: "Present in the sheet under this marketplace and appears once, but still didn't match — check for stray characters in the PO number.",
+    detail: "Present in the sheet under this marketplace and appears once, but still didn't match — needs manual review.",
   };
 }
 
@@ -267,6 +369,6 @@ function logDiagnostics(marketplaceName: string, unmatched: UnmatchedDeliveredPo
   if (unmatched.length === 0) return;
   console.warn(`[${marketplaceName}] ${unmatched.length} Delivered PO(s) not enriched by this Dispatch sync:`);
   for (const u of unmatched) {
-    console.warn(`  - ${u.poNumber}: [${u.reason}] ${u.detail}`);
+    console.warn(`  - PO ${u.poNumber} | Marketplace ${u.marketplace} | Reason: ${u.reason} — ${u.detail}`);
   }
 }

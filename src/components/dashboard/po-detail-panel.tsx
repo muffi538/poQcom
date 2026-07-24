@@ -97,7 +97,7 @@ export function PoDetailPanel({ row, onClose }: { row: PoRow; onClose: () => voi
           <Field label="PO Value" value={fmtCurrency(row.po.poValue)} />
           <Field
             label="Days to Dispatch"
-            value={row.po.operationalDispatchDays === null ? "—" : `${row.po.operationalDispatchDays}d`}
+            value={row.po.fulfilmentDays === null ? "—" : `${row.po.fulfilmentDays}d`}
           />
           <Field label="Fill Rate" value={row.po.fillRate === null ? "—" : `${row.po.fillRate}%`} />
           <Field label="Dispatcher" value={row.po.dispatcherName ?? "—"} />
