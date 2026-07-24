@@ -95,11 +95,32 @@ function nullsLast<T>(a: T | null, b: T | null, compare: (a: T, b: T) => number)
 // From, ...) is read straight off the stored PurchaseOrder columns — see
 // buildDeliveredRows/buildDeliveredStats — never recomputed here, so an
 // unmatched Delivered PO shows "—", never a fabricated value.
+type FillRateBucket = "all" | "gt90" | "lt50";
+type DeliverySpeedBucket = "all" | "le3" | "4to7" | "gt7";
+
+function matchesFillRateBucket(fillRate: number | null, bucket: FillRateBucket): boolean {
+  if (bucket === "all") return true;
+  if (fillRate === null) return false; // an unmatched PO has no rate to test against either bucket
+  if (bucket === "gt90") return fillRate > 90;
+  return fillRate < 50; // lt50
+}
+
+function matchesDeliverySpeedBucket(fulfilmentDays: number | null, bucket: DeliverySpeedBucket): boolean {
+  if (bucket === "all") return true;
+  if (fulfilmentDays === null) return false;
+  if (bucket === "le3") return fulfilmentDays <= 3;
+  if (bucket === "4to7") return fulfilmentDays >= 4 && fulfilmentDays <= 7;
+  return fulfilmentDays > 7; // gt7
+}
+
 export function DeliveredPoTable({ rows }: { rows: DeliveredRow[] }) {
   const [selected, setSelected] = useState<DeliveredRow | null>(null);
   const [cityFilter, setCityFilter] = useState<string>("all");
   const [marketplaceFilter, setMarketplaceFilter] = useState<string>("all");
   const [dispatcherFilter, setDispatcherFilter] = useState<string>("all");
+  const [dispatchedFromFilter, setDispatchedFromFilter] = useState<string>("all");
+  const [fillRateBucket, setFillRateBucket] = useState<FillRateBucket>("all");
+  const [deliverySpeedBucket, setDeliverySpeedBucket] = useState<DeliverySpeedBucket>("all");
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<ColumnKey | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
@@ -110,12 +131,19 @@ export function DeliveredPoTable({ rows }: { rows: DeliveredRow[] }) {
     () => Array.from(new Set(rows.map((r) => r.po.dispatcherName).filter((v): v is string => Boolean(v)))).sort(),
     [rows]
   );
+  const dispatchedFroms = useMemo(
+    () => Array.from(new Set(rows.map((r) => r.po.dispatchedFrom).filter((v): v is string => Boolean(v)))).sort(),
+    [rows]
+  );
 
   const filtered = useMemo(() => {
     return rows.filter((r) => {
       if (cityFilter !== "all" && r.po.city !== cityFilter) return false;
       if (marketplaceFilter !== "all" && r.po.marketplace !== marketplaceFilter) return false;
       if (dispatcherFilter !== "all" && r.po.dispatcherName !== dispatcherFilter) return false;
+      if (dispatchedFromFilter !== "all" && r.po.dispatchedFrom !== dispatchedFromFilter) return false;
+      if (!matchesFillRateBucket(r.po.fillRate, fillRateBucket)) return false;
+      if (!matchesDeliverySpeedBucket(r.po.fulfilmentDays, deliverySpeedBucket)) return false;
       if (search.trim()) {
         const q = search.trim().toLowerCase();
         const haystack = [r.po.id, r.po.sku, r.po.dispatcherName, r.po.dispatchedFrom, r.po.shipmentId]
@@ -125,7 +153,7 @@ export function DeliveredPoTable({ rows }: { rows: DeliveredRow[] }) {
       }
       return true;
     });
-  }, [rows, cityFilter, marketplaceFilter, dispatcherFilter, search]);
+  }, [rows, cityFilter, marketplaceFilter, dispatcherFilter, dispatchedFromFilter, fillRateBucket, deliverySpeedBucket, search]);
 
   const sorted = useMemo(() => {
     if (!sortKey) return filtered;
@@ -208,6 +236,31 @@ export function DeliveredPoTable({ rows }: { rows: DeliveredRow[] }) {
                   ))}
                 </select>
               )}
+              {dispatchedFroms.length > 0 && (
+                <select value={dispatchedFromFilter} onChange={(e) => setDispatchedFromFilter(e.target.value)} className={inputClasses}>
+                  <option value="all">Dispatched From: All</option>
+                  {dispatchedFroms.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <select value={fillRateBucket} onChange={(e) => setFillRateBucket(e.target.value as FillRateBucket)} className={inputClasses}>
+                <option value="all">Fill Rate: All</option>
+                <option value="gt90">Fill Rate &gt; 90%</option>
+                <option value="lt50">Fill Rate &lt; 50%</option>
+              </select>
+              <select
+                value={deliverySpeedBucket}
+                onChange={(e) => setDeliverySpeedBucket(e.target.value as DeliverySpeedBucket)}
+                className={inputClasses}
+              >
+                <option value="all">Delivered in: All</option>
+                <option value="le3">≤ 3 days</option>
+                <option value="4to7">4–7 days</option>
+                <option value="gt7">&gt; 7 days</option>
+              </select>
               <div className="relative">
                 <Search size={12} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-neutral-400" />
                 <input
