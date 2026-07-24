@@ -26,6 +26,8 @@ interface PoRowFromDb {
   fill_rate: number | null;
   dispatcher_name: string | null;
   driver_name: string | null;
+  dispatched_from: string | null;
+  dispatch_appt_qty: number | null;
   operational_dispatch_days: number | null;
   marketplaces: { name: string } | null;
 }
@@ -41,7 +43,8 @@ interface ItemRowFromDb {
 
 const PO_SELECT =
   "id, po_number, status, city, warehouse, po_raised_date, expiry_date, appointment_date, dispatch_date, " +
-  "ordered_qty, dispatched_qty, pending_qty, po_value, fill_rate, dispatcher_name, driver_name, operational_dispatch_days, marketplaces(name)";
+  "ordered_qty, dispatched_qty, pending_qty, po_value, fill_rate, dispatcher_name, driver_name, dispatched_from, " +
+  "dispatch_appt_qty, operational_dispatch_days, marketplaces(name)";
 
 // PostgREST's .in() filter puts every id in the request URL — with
 // hundreds of POs (each a 36-char uuid) that URL gets long enough to
@@ -115,6 +118,8 @@ async function assemblePurchaseOrders(poRows: PoRowFromDb[]): Promise<PurchaseOr
       fillRate: po.fill_rate,
       dispatcherName: po.dispatcher_name,
       driverName: po.driver_name,
+      dispatchedFrom: po.dispatched_from,
+      dispatchApptQty: po.dispatch_appt_qty,
       operationalDispatchDays: po.operational_dispatch_days,
       raw: { lineItems },
     } satisfies PurchaseOrder;

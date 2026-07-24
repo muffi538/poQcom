@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { Search, SearchX } from "lucide-react";
 import { DeliveredRow } from "@/lib/workflows/delivered-workflow";
 import { MarketplaceBadge } from "./marketplace-badge";
-import { fmtDate } from "./po-format";
+import { fmtDate, fmtCurrency } from "./po-format";
 import { ExportButton } from "./export-button";
 import { CsvCell } from "@/lib/export/csv";
 import { WorkflowDetailPanel } from "./workflow-detail-panel";
@@ -17,17 +17,24 @@ const EXPORT_HEADERS = [
   "Marketplace",
   "PO Date",
   "Dispatch Date",
-  "Shipping Duration (days)",
+  "Fulfilment Time (days)",
   "Fill Rate (%)",
   "Dispatcher",
   "Driver",
+  "Dispatched From",
   "Ordered Qty",
   "Dispatched Qty",
+  "Pending Qty",
+  "PO Value",
 ];
 
 // The Delivered workflow's table (PO_Operations_Architecture_1.md) — no
 // score/rank/priority anywhere, by construction: DeliveredRow has no
-// such field, and this component never imports rules/ or demand/.
+// such field, and this component never imports rules/ or demand/. Fill
+// Rate/Fulfilment Time are only ever shown when the underlying PO field
+// is non-null — never a fabricated/computed stand-in (see
+// buildDeliveredRows) — so a Delivered PO the Dispatch workbook hasn't
+// matched yet shows "—", never a fake 100%.
 export function DeliveredPoTable({ rows }: { rows: DeliveredRow[] }) {
   const [selected, setSelected] = useState<DeliveredRow | null>(null);
   const [cityFilter, setCityFilter] = useState<string>("all");
@@ -51,12 +58,15 @@ export function DeliveredPoTable({ rows }: { rows: DeliveredRow[] }) {
     r.po.marketplace,
     r.po.poRaisedDate || null,
     r.po.dispatchDate,
-    r.shippingDurationDays,
+    r.fulfilmentTimeDays,
     r.fillRate,
     r.dispatcherName,
     r.driverName,
+    r.po.dispatchedFrom,
     r.po.orderedQty,
     r.po.dispatchedQty,
+    r.po.pendingQty,
+    r.po.poValue,
   ]);
 
   return (
@@ -115,7 +125,7 @@ export function DeliveredPoTable({ rows }: { rows: DeliveredRow[] }) {
             </colgroup>
             <thead className="sticky top-0 z-10 bg-white text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:bg-neutral-900">
               <tr className="border-b border-frido-border dark:border-white/10">
-                {["PO Number", "Mkt", "PO Date", "Dispatch Date", "Shipping Time", "Fill Rate", "Dispatcher", "Driver", "Ordered", "Dispatched"].map(
+                {["PO Number", "Mkt", "PO Date", "Dispatch Date", "Fulfilment Time", "Fill Rate", "Dispatcher", "Driver", "Ordered", "Dispatched"].map(
                   (h) => (
                     <th key={h} className="whitespace-nowrap px-1.5 py-1.5">
                       {h}
@@ -139,7 +149,7 @@ export function DeliveredPoTable({ rows }: { rows: DeliveredRow[] }) {
                   </td>
                   <td className="whitespace-nowrap px-1.5 text-neutral-500">{fmtDate(r.po.poRaisedDate)}</td>
                   <td className="whitespace-nowrap px-1.5 text-neutral-500">{fmtDate(r.po.dispatchDate)}</td>
-                  <td className="px-1.5 tabular-nums">{r.shippingDurationDays === null ? "—" : `${r.shippingDurationDays}d`}</td>
+                  <td className="px-1.5 tabular-nums">{r.fulfilmentTimeDays === null ? "—" : `${r.fulfilmentTimeDays}d`}</td>
                   <td className="px-1.5 tabular-nums">{r.fillRate === null ? "—" : `${r.fillRate}%`}</td>
                   <td className="truncate px-1.5" title={r.dispatcherName ?? undefined}>
                     {r.dispatcherName ?? "—"}
@@ -165,10 +175,13 @@ export function DeliveredPoTable({ rows }: { rows: DeliveredRow[] }) {
         <WorkflowDetailPanel
           po={selected.po}
           extraFields={[
-            { label: "Shipping Duration", value: selected.shippingDurationDays === null ? "—" : `${selected.shippingDurationDays}d` },
+            { label: "Fulfilment Time", value: selected.fulfilmentTimeDays === null ? "—" : `${selected.fulfilmentTimeDays}d` },
+            { label: "Pending Qty", value: selected.po.pendingQty.toLocaleString("en-IN") },
             { label: "Fill Rate", value: selected.fillRate === null ? "—" : `${selected.fillRate}%` },
             { label: "Dispatcher", value: selected.dispatcherName ?? "—" },
+            { label: "Dispatched From", value: selected.po.dispatchedFrom ?? "—" },
             { label: "Driver", value: selected.driverName ?? "—" },
+            { label: "PO Value", value: fmtCurrency(selected.po.poValue) },
           ]}
           onClose={() => setSelected(null)}
         />

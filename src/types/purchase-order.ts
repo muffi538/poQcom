@@ -45,6 +45,8 @@ export interface PurchaseOrder {
   fillRate: number | null; // (Dispatched Qty / Appt Qty) × 100, from the Dispatch sheet's own numbers
   dispatcherName: string | null;
   driverName: string | null; // from the Dispatch workbook, when mapped — null otherwise, never fabricated
+  dispatchedFrom: string | null; // Dispatch workbook's own "Dispatched from" location — distinct from `warehouse` (the Shipment Tracker's FC)
+  dispatchApptQty: number | null; // Dispatch workbook's own "Appt Quantity" — distinct from `orderedQty` (owned by the PO workbook)
   operationalDispatchDays: number | null; // Dispatch Date − this PO's own PO Raised Date
 
   raw: Record<string, unknown>; // untouched source row, for debugging/audit
