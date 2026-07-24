@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Search, SearchX, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { DeliveredRow, buildDeliveredStats } from "@/lib/workflows/delivered-workflow";
 import { MarketplaceBadge } from "./marketplace-badge";
+import { StatusBadge } from "./status-badge";
 import { fmtDate, fmtCurrency } from "./po-format";
 import { ExportButton } from "./export-button";
 import { CsvCell } from "@/lib/export/csv";
@@ -14,51 +15,59 @@ const inputClasses =
   "rounded-lg border border-frido-border bg-white px-2 py-1 text-xs shadow-sm outline-none transition-colors focus:border-[var(--mp-accent)] dark:border-white/10 dark:bg-neutral-900";
 
 const EXPORT_HEADERS = [
-  "PO Number",
+  "Status",
   "Marketplace",
+  "PO Number",
   "City",
-  "Dispatcher",
-  "Driver",
-  "Dispatched From",
   "PO Date",
   "Dispatch Date",
-  "Fulfilment Days",
+  "Delivery Days",
+  "Dispatcher",
+  "Dispatched From",
   "Ordered Qty",
+  "Appointment Qty",
   "Dispatched Qty",
-  "Pending Qty",
   "Fill Rate (%)",
   "Value",
-  "Appointment Qty",
+  "Pending Qty",
+  "Driver",
   "Shipment ID",
   "Invoice",
   "MRP Label",
 ];
 
 type ColumnKey =
-  | "po"
+  | "status"
   | "marketplace"
+  | "po"
   | "city"
-  | "dispatcher"
-  | "dispatchedFrom"
   | "poDate"
   | "dispatchDate"
   | "fulfilmentDays"
+  | "dispatcher"
+  | "dispatchedFrom"
   | "orderedQty"
+  | "appointmentQty"
   | "dispatchedQty"
   | "fillRate"
   | "value";
 
+// Exact column order requested: Status, Marketplace, PO Number, City, PO
+// Date, Dispatch Date, Delivery Days, Dispatcher, Dispatched From,
+// Ordered Qty, Appointment Qty, Dispatched Qty, Fill Rate %, Value.
 const COLUMNS: Array<{ key: ColumnKey; label: string; width: number; numeric?: boolean }> = [
-  { key: "po", label: "PO", width: 130 },
+  { key: "status", label: "Status", width: 84 },
   { key: "marketplace", label: "Marketplace", width: 92 },
+  { key: "po", label: "PO Number", width: 130 },
   { key: "city", label: "City", width: 100 },
-  { key: "dispatcher", label: "Dispatcher", width: 110 },
-  { key: "dispatchedFrom", label: "Dispatched From", width: 110 },
   { key: "poDate", label: "PO Date", width: 92 },
   { key: "dispatchDate", label: "Dispatch Date", width: 92 },
-  { key: "fulfilmentDays", label: "Fulfilment Days", width: 90, numeric: true },
+  { key: "fulfilmentDays", label: "Delivery Days", width: 90, numeric: true },
+  { key: "dispatcher", label: "Dispatcher", width: 110 },
+  { key: "dispatchedFrom", label: "Dispatched From", width: 110 },
   { key: "orderedQty", label: "Ordered Qty", width: 80, numeric: true },
-  { key: "dispatchedQty", label: "Dispatched Qty", width: 86, numeric: true },
+  { key: "appointmentQty", label: "Appointment Qty", width: 90, numeric: true },
+  { key: "dispatchedQty", label: "Dispatched Qty", width: 100, numeric: true },
   { key: "fillRate", label: "Fill Rate %", width: 80, numeric: true },
   { key: "value", label: "Value", width: 96, numeric: true },
 ];
@@ -67,15 +76,17 @@ const COLUMNS: Array<{ key: ColumnKey; label: string; width: number; numeric?: b
 // Nulls always sort last regardless of direction, so an unmatched
 // Delivered PO's blank fields don't scatter across the middle of a sort.
 const COMPARATORS: Record<ColumnKey, (a: DeliveredRow, b: DeliveredRow) => number> = {
-  po: (a, b) => a.po.id.localeCompare(b.po.id),
+  status: () => 0, // constant "Delivered" for every row in this table — nothing to order by
   marketplace: (a, b) => a.po.marketplace.localeCompare(b.po.marketplace),
+  po: (a, b) => a.po.id.localeCompare(b.po.id),
   city: (a, b) => a.po.city.localeCompare(b.po.city),
-  dispatcher: (a, b) => nullsLast(a.po.dispatcherName, b.po.dispatcherName, (x, y) => x.localeCompare(y)),
-  dispatchedFrom: (a, b) => nullsLast(a.po.dispatchedFrom, b.po.dispatchedFrom, (x, y) => x.localeCompare(y)),
   poDate: (a, b) => (a.po.poRaisedDate || "").localeCompare(b.po.poRaisedDate || ""),
   dispatchDate: (a, b) => nullsLast(a.po.dispatchDate, b.po.dispatchDate, (x, y) => x.localeCompare(y)),
   fulfilmentDays: (a, b) => nullsLast(a.po.fulfilmentDays, b.po.fulfilmentDays, (x, y) => x - y),
+  dispatcher: (a, b) => nullsLast(a.po.dispatcherName, b.po.dispatcherName, (x, y) => x.localeCompare(y)),
+  dispatchedFrom: (a, b) => nullsLast(a.po.dispatchedFrom, b.po.dispatchedFrom, (x, y) => x.localeCompare(y)),
   orderedQty: (a, b) => a.po.orderedQty - b.po.orderedQty,
+  appointmentQty: (a, b) => nullsLast(a.po.appointmentQty, b.po.appointmentQty, (x, y) => x - y),
   dispatchedQty: (a, b) => a.po.dispatchedQty - b.po.dispatchedQty,
   fillRate: (a, b) => nullsLast(a.po.fillRate, b.po.fillRate, (x, y) => x - y),
   value: (a, b) => nullsLast(a.po.poValue, b.po.poValue, (x, y) => x - y),
@@ -174,21 +185,22 @@ export function DeliveredPoTable({ rows }: { rows: DeliveredRow[] }) {
   }
 
   const exportRows: CsvCell[][] = sorted.map((r) => [
-    r.po.id,
+    r.po.status,
     r.po.marketplace,
+    r.po.id,
     r.po.city,
-    r.po.dispatcherName,
-    r.po.driverName,
-    r.po.dispatchedFrom,
     r.po.poRaisedDate || null,
     r.po.dispatchDate,
     r.po.fulfilmentDays,
+    r.po.dispatcherName,
+    r.po.dispatchedFrom,
     r.po.orderedQty,
+    r.po.appointmentQty,
     r.po.dispatchedQty,
-    r.po.pendingQty,
     r.po.fillRate,
     r.po.poValue,
-    r.po.appointmentQty,
+    r.po.pendingQty,
+    r.po.driverName,
     r.po.shipmentId,
     r.po.invoice === null ? null : r.po.invoice ? "TRUE" : "FALSE",
     r.po.mrpLabel === null ? null : r.po.mrpLabel ? "TRUE" : "FALSE",
@@ -281,7 +293,7 @@ export function DeliveredPoTable({ rows }: { rows: DeliveredRow[] }) {
 
       {rows.length > 0 && (
         <div className="flex flex-wrap gap-1">
-          <KpiCard label="Avg Fulfilment Days" value={stats.avgFulfilmentDays === null ? "—" : `${stats.avgFulfilmentDays}d`} tone="accent" />
+          <KpiCard label="Avg Delivery Days" value={stats.avgFulfilmentDays === null ? "—" : `${stats.avgFulfilmentDays}d`} tone="accent" />
           <KpiCard label="Avg Fill Rate" value={stats.avgFillRate === null ? "—" : `${stats.avgFillRate}%`} tone="accent" />
           <KpiCard label="Best Fill Rate" value={stats.bestFillRate === null ? "—" : `${stats.bestFillRate}%`} tone="low" />
           <KpiCard label="Fastest Delivery" value={stats.fastestDeliveryDays === null ? "—" : `${stats.fastestDeliveryDays}d`} tone="low" />
@@ -327,26 +339,35 @@ export function DeliveredPoTable({ rows }: { rows: DeliveredRow[] }) {
                   onClick={() => setSelected(r)}
                   className="h-10 cursor-pointer transition-colors hover:bg-[var(--mp-primary)]/[0.06]"
                 >
-                  <td className="truncate px-1.5 font-medium" title={r.po.id}>
-                    {r.po.id}
+                  <td className="truncate px-1.5">
+                    <StatusBadge status={r.po.status} compact />
                   </td>
                   <td className="truncate px-1.5">
                     <MarketplaceBadge marketplace={r.po.marketplace} compact />
                   </td>
+                  <td className="truncate px-1.5 font-medium" title={r.po.id}>
+                    {r.po.id}
+                  </td>
                   <td className="truncate px-1.5 text-neutral-500" title={r.po.city}>
                     {r.po.city}
                   </td>
+                  <td className="whitespace-nowrap px-1.5 text-neutral-500">{fmtDate(r.po.poRaisedDate)}</td>
+                  <td className="whitespace-nowrap px-1.5 text-neutral-500">{fmtDate(r.po.dispatchDate)}</td>
+                  <td className="px-1.5 tabular-nums">{r.po.fulfilmentDays === null ? "—" : `${r.po.fulfilmentDays}d`}</td>
                   <td className="truncate px-1.5" title={r.po.dispatcherName ?? undefined}>
                     {r.po.dispatcherName ?? "—"}
                   </td>
                   <td className="truncate px-1.5" title={r.po.dispatchedFrom ?? undefined}>
                     {r.po.dispatchedFrom ?? "—"}
                   </td>
-                  <td className="whitespace-nowrap px-1.5 text-neutral-500">{fmtDate(r.po.poRaisedDate)}</td>
-                  <td className="whitespace-nowrap px-1.5 text-neutral-500">{fmtDate(r.po.dispatchDate)}</td>
-                  <td className="px-1.5 tabular-nums">{r.po.fulfilmentDays === null ? "—" : `${r.po.fulfilmentDays}d`}</td>
                   <td className="px-1.5 tabular-nums">{r.po.orderedQty.toLocaleString("en-IN")}</td>
-                  <td className="px-1.5 tabular-nums">{r.po.dispatchedQty.toLocaleString("en-IN")}</td>
+                  <td className="px-1.5 tabular-nums">{r.po.appointmentQty === null ? "—" : r.po.appointmentQty.toLocaleString("en-IN")}</td>
+                  <td className="px-1.5 tabular-nums">
+                    {r.po.dispatchedQty.toLocaleString("en-IN")}
+                    {r.po.appointmentQty !== null && (
+                      <span className="text-neutral-400"> / {r.po.appointmentQty.toLocaleString("en-IN")}</span>
+                    )}
+                  </td>
                   <td className="px-1.5 tabular-nums">{r.po.fillRate === null ? "—" : `${r.po.fillRate}%`}</td>
                   <td className="px-1.5 tabular-nums">{fmtCurrency(r.po.poValue)}</td>
                 </tr>
@@ -365,7 +386,7 @@ export function DeliveredPoTable({ rows }: { rows: DeliveredRow[] }) {
         <WorkflowDetailPanel
           po={selected.po}
           extraFields={[
-            { label: "Fulfilment Days", value: selected.po.fulfilmentDays === null ? "—" : `${selected.po.fulfilmentDays}d` },
+            { label: "Delivery Days", value: selected.po.fulfilmentDays === null ? "—" : `${selected.po.fulfilmentDays}d` },
             { label: "Pending Qty", value: selected.po.pendingQty.toLocaleString("en-IN") },
             { label: "Fill Rate", value: selected.po.fillRate === null ? "—" : `${selected.po.fillRate}%` },
             { label: "Dispatcher", value: selected.po.dispatcherName ?? "—" },

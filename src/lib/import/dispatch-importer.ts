@@ -1,7 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { loadFieldMappings, extractRowsByHeader } from "./field-mappings";
 import { toNumber } from "./parsing";
-import { parseSheetDateDayFirst, daysBetween } from "@/lib/po/dates";
+import { parseSheetDate, parseSheetDateDayFirst, daysBetween } from "@/lib/po/dates";
 
 export type UnmatchedReason =
   | "missing_dispatch_record" // PO missing from Dispatch Workbook entirely
@@ -48,6 +48,51 @@ function parseChecklistBool(value: string): boolean | null {
   if (v === "TRUE") return true;
   if (v === "FALSE") return false;
   return null; // blank/unrecognized — never fabricated
+}
+
+// Confirmed against the live sheet (2026-07-24): its Dispatched Date
+// column is NOT uniformly d/m/yyyy. Classifying every raw value showed
+// 112 rows unambiguously d/m (day component >12), 54 rows unambiguously
+// m/d (month-first — day component >12, meaning parseSheetDateDayFirst
+// would silently return null for these), and 84 rows genuinely ambiguous
+// (both components ≤12, e.g. "7/2/2026"). This is a real inconsistency
+// in the source workbook (different people/locales entering dates), not
+// a parsing mistake — proven by PO 48287510037612, whose "7/2/2026" read
+// as d/m (Feb 7) produced a NEGATIVE fulfilment_days (-142d) against its
+// own po_raised_date of 29 Jun 2026, which is impossible (a PO cannot be
+// dispatched before it was raised); read as m/d (Jul 2) it's a sensible
+// +3 days, consistent with every other real match in this data.
+//
+// Whichever interpretation is structurally valid wins outright (only one
+// parser returns non-null when a component is >12). When both parse
+// successfully (genuinely ambiguous), the PO's own po_raised_date — from
+// the PO workbook, a different and reliably m/d/yyyy source — is used as
+// an anchor to pick whichever interpretation is chronologically sensible
+// (dispatch can't precede the PO being raised, and in every confirmed
+// real match fulfilment lands within days/weeks, never negative or wildly
+// large). This never invents a date; it only chooses between the two
+// real readings of the exact same cell.
+function resolveDispatchDate(rawValue: string, poRaisedDate: string | null): string | null {
+  const dayFirst = parseSheetDateDayFirst(rawValue);
+  const monthFirst = parseSheetDate(rawValue);
+
+  if (dayFirst && !monthFirst) return dayFirst;
+  if (monthFirst && !dayFirst) return monthFirst;
+  if (!dayFirst && !monthFirst) return null;
+  if (dayFirst === monthFirst) return dayFirst;
+
+  if (!poRaisedDate || !dayFirst || !monthFirst) return dayFirst; // no anchor to disambiguate — keep the confirmed default
+
+  const dayFirstGap = daysBetween(poRaisedDate, dayFirst);
+  const monthFirstGap = daysBetween(poRaisedDate, monthFirst);
+  const isSensible = (gap: number) => gap >= 0 && gap <= 180;
+
+  if (isSensible(dayFirstGap) && !isSensible(monthFirstGap)) return dayFirst;
+  if (isSensible(monthFirstGap) && !isSensible(dayFirstGap)) return monthFirst;
+  if (isSensible(dayFirstGap) && isSensible(monthFirstGap)) {
+    return dayFirstGap <= monthFirstGap ? dayFirst : monthFirst; // prefer the shorter, more typical fulfilment window
+  }
+  return dayFirst; // neither is chronologically sensible — fall back to the confirmed default rather than guessing
 }
 
 // The Dispatch workbook ("MP Dispatched Consignment Checklist") is a
@@ -174,7 +219,7 @@ export async function importDispatchWorkbookRows(params: {
   const lines = relevantRows.map((row) => ({
     poKey: buildKey(get(row, "po_number")),
     shipmentId: get(row, "po_number").trim() || null,
-    dispatchDate: parseSheetDateDayFirst(get(row, "dispatch_date")),
+    dispatchDateRaw: get(row, "dispatch_date"),
     dispatchedQty: toNumber(get(row, "dispatched_qty")),
     apptQty: toNumber(get(row, "ordered_qty")),
     dispatcherName: get(row, "dispatcher_name") || null,
@@ -227,7 +272,8 @@ export async function importDispatchWorkbookRows(params: {
     }
     touchedPoKeys.add(poKey);
 
-    const dispatchDate = group.map((l) => l.dispatchDate).find((v) => v) ?? null;
+    const dispatchDate =
+      group.map((l) => resolveDispatchDate(l.dispatchDateRaw, existing.po_raised_date)).find((v) => v) ?? null;
     const dispatcherName = group.map((l) => l.dispatcherName).find((v) => v) ?? null;
     const driverName = group.map((l) => l.driverName).find((v) => v) ?? null;
     const dispatchedFrom = group.map((l) => l.dispatchedFrom).find((v) => v) ?? null;

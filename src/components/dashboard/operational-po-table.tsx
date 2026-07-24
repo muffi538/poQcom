@@ -37,7 +37,7 @@ const VARIANT_COLUMNS: Record<OperationalVariant, ColumnDef[]> = {
     { key: "dispatchDate", label: "Dispatch Date", width: 100, render: (po) => fmtDate(po.dispatchDate), csv: (po) => po.dispatchDate },
     {
       key: "fulfilmentDays",
-      label: "Fulfilment Days",
+      label: "Delivery Days",
       width: 90,
       render: (po) => (po.fulfilmentDays === null ? "—" : `${po.fulfilmentDays}d`),
       csv: (po) => po.fulfilmentDays,
@@ -91,7 +91,7 @@ const VARIANT_COLUMNS: Record<OperationalVariant, ColumnDef[]> = {
 // Scheduled, Cancelled, Low Value) keep the base fields only, unchanged.
 function dispatchedExtraFields(po: PurchaseOrder) {
   return [
-    { label: "Fulfilment Days", value: po.fulfilmentDays === null ? "—" : `${po.fulfilmentDays}d` },
+    { label: "Delivery Days", value: po.fulfilmentDays === null ? "—" : `${po.fulfilmentDays}d` },
     { label: "Fill Rate", value: po.fillRate === null ? "—" : `${po.fillRate}%` },
     { label: "Dispatcher", value: po.dispatcherName ?? "—" },
     { label: "Dispatched From", value: po.dispatchedFrom ?? "—" },
