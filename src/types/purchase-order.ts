@@ -1,3 +1,5 @@
+import { daysBetween } from "@/lib/po/dates";
+
 // One SKU line on a PO — kept per-line (not just summed into the PO
 // total) because Demand Intelligence needs to know how much of a
 // specific SKU is pending, not just the PO's overall qty.
@@ -42,6 +44,7 @@ export interface PurchaseOrder {
   // first dispatch update, not an error).
   fillRate: number | null; // (Dispatched Qty / Appt Qty) × 100, from the Dispatch sheet's own numbers
   dispatcherName: string | null;
+  driverName: string | null; // from the Dispatch workbook, when mapped — null otherwise, never fabricated
   operationalDispatchDays: number | null; // Dispatch Date − this PO's own PO Raised Date
 
   raw: Record<string, unknown>; // untouched source row, for debugging/audit
@@ -100,6 +103,10 @@ export function isLowValueCantDispatch(status: string): boolean {
   return status.trim().toLowerCase() === "low value cant dispatch";
 }
 
+// Literal "Expired" text, if a sheet ever writes it directly. Distinct
+// from the computed Expired-Pending sub-state in classifyOperationalStatus
+// below (per the architecture doc: "Only Pending POs that passed expiry"
+// — Expired is a date-computed sub-state of Pending, not raw sheet text).
 export function isExpiredStatus(status: string): boolean {
   return status.trim().toLowerCase() === "expired";
 }
@@ -108,31 +115,58 @@ export function isPendingStatus(status: string): boolean {
   return status.trim().toLowerCase() === "pending";
 }
 
-// Routes a PO to exactly one bucket, per the confirmed status handling:
-// only "Pending" runs through the priority scoring chain. "Expired",
-// "Dispatched", "Delivered", and "Cancelled" each get their own
-// read-only section/tab instead of being mixed into the ranked table or
-// silently dropped. Only RTO Done/Low Value Cant Dispatch are hidden
-// entirely — nobody's asked to see those. Anything else (Price issue,
-// Scheduled, Revised appt. required, ...) is real, unclassified ground —
-// surfaced as "Needs Review" rather than silently scored or hidden,
-// until confirmed.
-export type StatusBucket =
+export function isInTransitStatus(status: string): boolean {
+  return status.trim().toLowerCase() === "in transit";
+}
+
+// "Dispatch Scheduled" is grouped with "Scheduled" — both mean an
+// appointment/dispatch slot has been booked but nothing has left the
+// warehouse yet, the same operational state the doc's "Scheduled"
+// workflow describes.
+export function isScheduledStatus(status: string): boolean {
+  const normalized = status.trim().toLowerCase();
+  return normalized === "scheduled" || normalized === "dispatch scheduled";
+}
+
+// The 9 statuses from PO_Operations_Architecture_1.md. A PO belongs to
+// exactly one at any time — this is the single place that decides which,
+// and therefore the single place that decides whether the Priority
+// Engine may ever run for it (Pending and Expired only, per Golden Rule
+// #5 — see classifyOperationalStatus and how callers use it: buildPoRows/
+// computePoPriority must never be invoked for any other bucket).
+export type OperationalStatus =
   | "pending"
   | "expired"
-  | "dispatched"
   | "delivered"
+  | "dispatched"
+  | "in_transit"
+  | "scheduled"
   | "cancelled"
-  | "excluded"
+  | "low_value_cant_dispatch"
   | "needs_review";
 
-export function classifyStatus(status: string): StatusBucket {
-  if (isFullyExcludedStatus(status) || isLowValueCantDispatch(status)) return "excluded";
-  if (isCancelledStatus(status)) return "cancelled";
-  if (isDeliveredStatus(status)) return "delivered";
-  if (isDispatchedStatus(status)) return "dispatched";
-  if (isExpiredStatus(status)) return "expired";
-  if (isPendingStatus(status)) return "pending";
+// Routes a PO to exactly one of the 9 architectural statuses. Checked
+// most-specific-literal-text first; Expired is checked last among the
+// non-Pending cases and derived by date (today past the PO's own expiry
+// date) rather than by any raw status text, since no workbook ever
+// writes "Expired" as a status — it's a computed sub-state of Pending.
+// RTO Done stays a pre-filter callers apply via isFullyExcludedStatus
+// before ever calling this (unchanged from before this refactor — it's
+// not one of the doc's 9 statuses and nobody's asked to see it).
+export function classifyOperationalStatus(po: PurchaseOrder, today: Date = new Date()): OperationalStatus {
+  if (isCancelledStatus(po.status)) return "cancelled";
+  if (isLowValueCantDispatch(po.status)) return "low_value_cant_dispatch";
+  if (isDeliveredStatus(po.status)) return "delivered";
+  if (isInTransitStatus(po.status)) return "in_transit";
+  if (isScheduledStatus(po.status)) return "scheduled";
+  if (isDispatchedStatus(po.status)) return "dispatched";
+  if (isExpiredStatus(po.status)) return "expired";
+  if (isPendingStatus(po.status)) {
+    const todayIso = today.toISOString().slice(0, 10);
+    const daysRemaining = daysBetween(todayIso, po.expiryDate);
+    if (Number.isFinite(daysRemaining) && daysRemaining < 0) return "expired";
+    return "pending";
+  }
   return "needs_review";
 }
 

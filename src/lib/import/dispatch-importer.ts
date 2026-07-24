@@ -17,14 +17,20 @@ export interface ImportDispatchResult {
 // it can be dispatched. Per-SKU purchase_order_items updates are out of
 // scope: the real sheet has no SKU column at all.
 //
+// Per the status-first architecture (PO_Operations_Architecture_1.md,
+// Golden Rules #1/#4): the Shipment Tracker (PO workbook) is the ONLY
+// source of truth for Status — this importer must never write it, even
+// though every row in a "Dispatched Consignment Checklist" has, in
+// reality, already left the warehouse. Status changes (Dispatched, In
+// Transit, Delivered, ...) only ever arrive via the next PO workbook
+// sync. This importer is enrichment-only against whatever status the PO
+// already has.
+//
 // Confirmed with the user (2026-07-23) against the real workbook, which
 // has no Status/PO Date/City/SKU columns, and whose Dispatched Date
 // column is d/m/yyyy (this sheet's own locale) — unlike every PO/Sales
 // sheet, which is m/d/yyyy, so it needs parseSheetDateDayFirst, not
 // parseSheetDate:
-//   - status is set to the literal "Dispatched" for every matched row —
-//     this is a "Dispatched Consignment Checklist", every listed row has
-//     already left the warehouse. Not derived from dates or guessed.
 //   - operational_dispatch_days = this sheet's Dispatch Date minus the
 //     PO's own po_raised_date already in Supabase (from the PO workbook),
 //     since the sheet has no PO Date column of its own.
@@ -33,6 +39,9 @@ export interface ImportDispatchResult {
 //     never written to purchase_orders.ordered_qty, which stays owned by
 //     the PO workbook) rather than trusting the sheet's own "Fill Rate
 //     (%)" display column.
+//   - driver_name enriches the same way as dispatcher_name when the
+//     marketplace's mapping includes a "driver" column; null otherwise
+//     (no marketplace maps one today — graceful, not fabricated).
 export async function importDispatchWorkbookRows(params: {
   marketplaceId: string;
   marketplaceName: string;
@@ -65,6 +74,7 @@ export async function importDispatchWorkbookRows(params: {
     dispatchedQty: toNumber(get(row, "dispatched_qty")),
     apptQty: toNumber(get(row, "ordered_qty")),
     dispatcherName: get(row, "dispatcher_name") || null,
+    driverName: get(row, "driver") || null,
   }));
 
   const byPoNo = new Map<string, typeof lines>();
@@ -103,6 +113,7 @@ export async function importDispatchWorkbookRows(params: {
 
     const dispatchDate = group.map((l) => l.dispatchDate).find((v) => v) ?? null;
     const dispatcherName = group.map((l) => l.dispatcherName).find((v) => v) ?? null;
+    const driverName = group.map((l) => l.driverName).find((v) => v) ?? null;
     let dispatchedQty = 0;
     let apptQty = 0;
     for (const line of group) {
@@ -114,12 +125,16 @@ export async function importDispatchWorkbookRows(params: {
     const operationalDispatchDays =
       dispatchDate && existing.po_raised_date ? daysBetween(existing.po_raised_date, dispatchDate) : null;
 
-    const update: Record<string, unknown> = { status: "Dispatched" };
+    // Enrichment-only — never touches `status` (Golden Rule #1/#4:
+    // Shipment Tracker alone owns Status).
+    const update: Record<string, unknown> = {};
     if (dispatchDate) update.dispatch_date = dispatchDate;
     update.dispatched_qty = dispatchedQty;
     if (fillRate !== null) update.fill_rate = Math.round(fillRate * 100) / 100;
     if (dispatcherName) update.dispatcher_name = dispatcherName;
+    if (driverName) update.driver_name = driverName;
     if (operationalDispatchDays !== null) update.operational_dispatch_days = operationalDispatchDays;
+    if (Object.keys(update).length === 0) continue;
 
     const { error: updateError } = await supabase.from("purchase_orders").update(update).eq("id", existing.id);
     if (updateError) throw new Error(`Failed to update purchase_orders for PO ${poNo}: ${updateError.message}`);

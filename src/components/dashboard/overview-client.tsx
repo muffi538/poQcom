@@ -5,13 +5,17 @@ import { KpiCard } from "@/components/dashboard/kpi-card";
 import { PoControlTower } from "@/components/dashboard/po-control-tower";
 import { PoCharts } from "@/components/dashboard/po-charts";
 import { SecondaryPoTable } from "@/components/dashboard/secondary-po-table";
+import { DeliveredPoTable } from "@/components/dashboard/delivered-po-table";
+import { OperationalPoTable } from "@/components/dashboard/operational-po-table";
+import { NeedsReviewPoTable } from "@/components/dashboard/needs-review-po-table";
 import { DemandIntelligenceTabs } from "@/components/dashboard/demand-intelligence-tabs";
 import { SUPPORTED_MARKETPLACES, SupportedMarketplace } from "@/lib/sheets/marketplaces";
 import { MARKETPLACES } from "@/types/marketplace";
 import { buildTopSkuTable, TopSkuTableResult } from "@/lib/demand/sku-table";
 import { buildExecutiveSummary } from "@/lib/dashboard/summary";
 import { buildPoRows } from "@/lib/dashboard/po-rows";
-import { classifyStatus, isFullyExcludedStatus, isLowValueCantDispatch, PurchaseOrder } from "@/types/purchase-order";
+import { buildDeliveredRows } from "@/lib/workflows/delivered-workflow";
+import { classifyOperationalStatus, isFullyExcludedStatus, PurchaseOrder } from "@/types/purchase-order";
 import { Rule } from "@/types/rules";
 import { EngineConfig } from "@/lib/config/engine-config";
 import { DemandIndex } from "@/lib/demand/rank";
@@ -37,6 +41,12 @@ function fmtDays(n: number | null): string {
 // instantly on every change: KPIs, the ranked table, secondary tables,
 // charts, and Demand Intelligence all recompute from the same filtered
 // PurchaseOrder[] batch, never independently.
+//
+// Status-first routing (PO_Operations_Architecture_1.md): classified via
+// classifyOperationalStatus into 9 buckets; only Pending/Expired ever
+// reach buildPoRows/computePoPriority (the Priority Engine). Every other
+// bucket's row type carries no score/rank field, so there's no path left
+// that could accidentally score a Delivered/Dispatched/Cancelled/etc. PO.
 export function OverviewClient({
   pos,
   rules,
@@ -53,28 +63,45 @@ export function OverviewClient({
   const [dateFilter, setDateFilter] = useDateFilter();
   const hasRules = rules.some((r) => r.enabled);
 
-  const { summary, pendingRows, expiredRows, dispatchedRows, deliveredRows, needsReviewRows, topSkuByMarketplace } = useMemo(() => {
+  const {
+    summary,
+    pendingRows,
+    expiredRows,
+    deliveredRows,
+    dispatchedPos,
+    inTransitPos,
+    scheduledPos,
+    cancelledPos,
+    lowValuePos,
+    needsReviewPos,
+    topSkuByMarketplace,
+  } = useMemo(() => {
     const filteredPos = filterPurchaseOrdersByDate(pos, dateFilter);
+    const today = new Date();
 
-    // Status routing (confirmed): only "Pending" runs through the
-    // priority scoring chain. "Expired", "Dispatched", and "Delivered"
-    // each get their own read-only section instead of being mixed into
-    // the ranked table. Only Cancel/Cancelled/RTO Done/Low Value Cant
-    // Dispatch are excluded everywhere. Anything else is "Needs Review".
-    const visiblePos = filteredPos.filter((po) => !isFullyExcludedStatus(po.status) && !isLowValueCantDispatch(po.status));
-    const pendingPos = visiblePos.filter((po) => classifyStatus(po.status) === "pending");
-    const expiredPos = visiblePos.filter((po) => classifyStatus(po.status) === "expired");
-    const dispatchedPos = visiblePos.filter((po) => classifyStatus(po.status) === "dispatched");
-    const deliveredPos = visiblePos.filter((po) => classifyStatus(po.status) === "delivered");
-    const needsReviewPos = visiblePos.filter((po) => classifyStatus(po.status) === "needs_review");
+    const visiblePos = filteredPos.filter((po) => !isFullyExcludedStatus(po.status));
+    const byStatus = new Map<string, PurchaseOrder[]>();
+    for (const po of visiblePos) {
+      const bucket = classifyOperationalStatus(po, today);
+      const group = byStatus.get(bucket) ?? [];
+      group.push(po);
+      byStatus.set(bucket, group);
+    }
+    const pendingPos = byStatus.get("pending") ?? [];
+    const expiredPos = byStatus.get("expired") ?? [];
+    const deliveredPos = byStatus.get("delivered") ?? [];
 
     return {
       summary: buildExecutiveSummary(visiblePos, rules, config, demandIndex),
       pendingRows: buildPoRows(pendingPos, rules, config, demandIndex),
       expiredRows: buildPoRows(expiredPos, rules, config, demandIndex),
-      dispatchedRows: buildPoRows(dispatchedPos, rules, config, demandIndex),
-      deliveredRows: buildPoRows(deliveredPos, rules, config, demandIndex),
-      needsReviewRows: buildPoRows(needsReviewPos, rules, config, demandIndex),
+      deliveredRows: buildDeliveredRows(deliveredPos),
+      dispatchedPos: byStatus.get("dispatched") ?? [],
+      inTransitPos: byStatus.get("in_transit") ?? [],
+      scheduledPos: byStatus.get("scheduled") ?? [],
+      cancelledPos: byStatus.get("cancelled") ?? [],
+      lowValuePos: byStatus.get("low_value_cant_dispatch") ?? [],
+      needsReviewPos: byStatus.get("needs_review") ?? [],
       topSkuByMarketplace: Object.fromEntries(
         SUPPORTED_MARKETPLACES.map((m: SupportedMarketplace) => [m, buildTopSkuTable(m, demandIndex, pendingPos)])
       ) as Record<string, TopSkuTableResult>,
@@ -117,21 +144,26 @@ export function OverviewClient({
       <DemandIntelligenceTabs marketplaces={[...MARKETPLACES]} data={topSkuByMarketplace} />
       <details className="glass-card rounded-lg px-3 py-1.5 text-xs">
         <summary className="cursor-pointer select-none font-medium text-neutral-500">
-          Expired, Dispatched, Delivered, Needs Review, and Charts
+          Expired, Delivered, Dispatched, In Transit, Scheduled, Cancelled, Low Value, Needs Review, and Charts
         </summary>
         <div className="mt-2 space-y-3 pb-1">
-          <SecondaryPoTable title="Expired POs" rows={expiredRows} />
           <SecondaryPoTable
+            title="Expired POs"
+            note="Pending POs that passed their own expiry date — still run through the Priority Engine."
+            rows={expiredRows}
+          />
+          <DeliveredPoTable rows={deliveredRows} />
+          <OperationalPoTable
             title="Dispatched POs"
             note="Already shipped — read-only, kept for dispatch-performance history."
-            rows={dispatchedRows}
+            variant="dispatched"
+            pos={dispatchedPos}
           />
-          <SecondaryPoTable title="Delivered POs" note="Fulfilled — read-only, kept for analytics/trends." rows={deliveredRows} />
-          <SecondaryPoTable
-            title="Needs Review — status not yet classified"
-            note="Price issue, Scheduled, Revised appt. required, etc. — not run through priority scoring until confirmed how they should be handled."
-            rows={needsReviewRows}
-          />
+          <OperationalPoTable title="In Transit POs" variant="in_transit" pos={inTransitPos} />
+          <OperationalPoTable title="Scheduled POs" variant="scheduled" pos={scheduledPos} />
+          <OperationalPoTable title="Cancelled POs" note="Read-only — kept for record." variant="cancelled" pos={cancelledPos} />
+          <OperationalPoTable title="Low Value Can't Dispatch" variant="low_value_cant_dispatch" pos={lowValuePos} />
+          <NeedsReviewPoTable pos={needsReviewPos} />
           <PoCharts rows={pendingRows} />
         </div>
       </details>

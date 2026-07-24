@@ -2,44 +2,63 @@
 
 import { useMemo, useState } from "react";
 import { PoRow } from "@/lib/dashboard/po-rows";
+import { PurchaseOrder } from "@/types/purchase-order";
+import { DeliveredRow } from "@/lib/workflows/delivered-workflow";
 import { StatusTabBar } from "./status-tab-bar";
 import { PoControlTower } from "./po-control-tower";
 import { SecondaryPoTable } from "./secondary-po-table";
+import { DeliveredPoTable } from "./delivered-po-table";
+import { OperationalPoTable } from "./operational-po-table";
+import { NeedsReviewPoTable } from "./needs-review-po-table";
 import { DemandIntelligence } from "./demand-intelligence";
 import { PoCharts } from "./po-charts";
 import { TopSkuTableResult } from "@/lib/demand/sku-table";
 import { DateFilterState } from "@/lib/dashboard/date-filter";
 
-type TabKey = "all" | "pending" | "critical" | "delivered" | "dispatched" | "cancelled" | "expired" | "needs_review";
+type TabKey =
+  | "all"
+  | "pending"
+  | "critical"
+  | "expired"
+  | "delivered"
+  | "dispatched"
+  | "in_transit"
+  | "scheduled"
+  | "cancelled"
+  | "low_value"
+  | "needs_review";
 
 const TAB_LABELS: Record<TabKey, string> = {
   all: "All",
   pending: "Pending",
   critical: "Critical",
+  expired: "Expired",
   delivered: "Delivered",
   dispatched: "Dispatched",
+  in_transit: "In Transit",
+  scheduled: "Scheduled",
   cancelled: "Cancelled",
-  expired: "Expired",
+  low_value: "Low Value",
   needs_review: "Needs Review",
 };
 
-// Replaces the old "scroll past a collapsed <details> block to see
-// Expired/Dispatched/Delivered/Needs Review" pattern with a sticky tab
-// bar — every status is one click away, with a live count, and
-// switching tabs never reloads the page (confirmed requirements). Tab
-// selection lives here, entirely separate from each table's own
-// City/Search/Priority filter state, so changing a filter never resets
-// which tab is active. "Critical" is a shortcut onto the same Pending
-// rows with the ranked table's own Priority filter pre-set, not a
-// separate status — Cancel/Cancelled is a real bucket like the rest.
+// One tab per status in PO_Operations_Architecture_1.md, plus "All" and
+// the "Critical" shortcut onto Pending. Each tab renders its own
+// workflow's table with its own field set — only Pending/Critical route
+// through PoControlTower (the Priority Engine); every other tab is a
+// pure-display table with no score/rank column, by construction (their
+// row types don't carry one).
 export function MarketplaceTabbedView({
   marketplace,
   pendingRows,
-  deliveredRows,
-  dispatchedRows,
-  cancelledRows,
   expiredRows,
-  needsReviewRows,
+  deliveredRows,
+  dispatchedPos,
+  inTransitPos,
+  scheduledPos,
+  cancelledPos,
+  lowValuePos,
+  needsReviewPos,
   hasRules,
   demandError,
   topSkuData,
@@ -49,11 +68,14 @@ export function MarketplaceTabbedView({
 }: {
   marketplace: string;
   pendingRows: PoRow[];
-  deliveredRows: PoRow[];
-  dispatchedRows: PoRow[];
-  cancelledRows: PoRow[];
   expiredRows: PoRow[];
-  needsReviewRows: PoRow[];
+  deliveredRows: DeliveredRow[];
+  dispatchedPos: PurchaseOrder[];
+  inTransitPos: PurchaseOrder[];
+  scheduledPos: PurchaseOrder[];
+  cancelledPos: PurchaseOrder[];
+  lowValuePos: PurchaseOrder[];
+  needsReviewPos: PurchaseOrder[];
   hasRules: boolean;
   demandError?: string | null;
   topSkuData: TopSkuTableResult | null;
@@ -65,24 +87,36 @@ export function MarketplaceTabbedView({
 
   const criticalCount = useMemo(() => pendingRows.filter((r) => r.level === "Critical").length, [pendingRows]);
 
-  // Every visible PO regardless of status, in one place — the six
-  // buckets above are mutually exclusive (classifyStatus assigns each PO
-  // to exactly one), so concatenating them is a safe union with no
-  // double-counting.
-  const allRows = useMemo(
-    () => [...pendingRows, ...deliveredRows, ...dispatchedRows, ...cancelledRows, ...expiredRows, ...needsReviewRows],
-    [pendingRows, deliveredRows, dispatchedRows, cancelledRows, expiredRows, needsReviewRows]
+  // Every visible PO regardless of status, in one place — every bucket
+  // above is mutually exclusive (classifyOperationalStatus assigns each
+  // PO to exactly one), so this is a safe union with no double-counting.
+  const allPos = useMemo(
+    () => [
+      ...pendingRows.map((r) => r.po),
+      ...expiredRows.map((r) => r.po),
+      ...deliveredRows.map((r) => r.po),
+      ...dispatchedPos,
+      ...inTransitPos,
+      ...scheduledPos,
+      ...cancelledPos,
+      ...lowValuePos,
+      ...needsReviewPos,
+    ],
+    [pendingRows, expiredRows, deliveredRows, dispatchedPos, inTransitPos, scheduledPos, cancelledPos, lowValuePos, needsReviewPos]
   );
 
   const tabs = [
-    { key: "all", label: TAB_LABELS.all, count: allRows.length },
+    { key: "all", label: TAB_LABELS.all, count: allPos.length },
     { key: "pending", label: TAB_LABELS.pending, count: pendingRows.length },
     { key: "critical", label: TAB_LABELS.critical, count: criticalCount },
-    { key: "delivered", label: TAB_LABELS.delivered, count: deliveredRows.length },
-    { key: "dispatched", label: TAB_LABELS.dispatched, count: dispatchedRows.length },
-    { key: "cancelled", label: TAB_LABELS.cancelled, count: cancelledRows.length },
     { key: "expired", label: TAB_LABELS.expired, count: expiredRows.length },
-    { key: "needs_review", label: TAB_LABELS.needs_review, count: needsReviewRows.length },
+    { key: "delivered", label: TAB_LABELS.delivered, count: deliveredRows.length },
+    { key: "dispatched", label: TAB_LABELS.dispatched, count: dispatchedPos.length },
+    { key: "in_transit", label: TAB_LABELS.in_transit, count: inTransitPos.length },
+    { key: "scheduled", label: TAB_LABELS.scheduled, count: scheduledPos.length },
+    { key: "cancelled", label: TAB_LABELS.cancelled, count: cancelledPos.length },
+    { key: "low_value", label: TAB_LABELS.low_value, count: lowValuePos.length },
+    { key: "needs_review", label: TAB_LABELS.needs_review, count: needsReviewPos.length },
   ];
 
   return (
@@ -93,7 +127,7 @@ export function MarketplaceTabbedView({
           bucket starts with its own default filters rather than carrying
           over whatever was set on the previously-viewed tab. */}
       {activeTab === "all" && (
-        <SecondaryPoTable key={activeTab} title="All POs" note="Every status, combined — read-only." rows={allRows} />
+        <NeedsReviewPoTable key={activeTab} title="All POs" note="Every status, combined — read-only." pos={allPos} />
       )}
       {(activeTab === "pending" || activeTab === "critical") && (
         <PoControlTower
@@ -107,34 +141,37 @@ export function MarketplaceTabbedView({
           onDateFilterChange={onDateFilterChange}
         />
       )}
-      {activeTab === "delivered" && (
+      {activeTab === "expired" && (
         <SecondaryPoTable
           key={activeTab}
-          title="Delivered POs"
-          note="Fulfilled — read-only, kept for analytics/trends."
-          rows={deliveredRows}
+          title="Expired POs"
+          note="Pending POs that passed their own expiry date — still run through the Priority Engine (Operational Urgency drives their score)."
+          rows={expiredRows}
         />
       )}
+      {activeTab === "delivered" && <DeliveredPoTable key={activeTab} rows={deliveredRows} />}
       {activeTab === "dispatched" && (
-        <SecondaryPoTable
+        <OperationalPoTable
           key={activeTab}
           title="Dispatched POs"
           note="Already shipped — read-only, kept for dispatch-performance history."
-          rows={dispatchedRows}
+          variant="dispatched"
+          pos={dispatchedPos}
         />
+      )}
+      {activeTab === "in_transit" && (
+        <OperationalPoTable key={activeTab} title="In Transit POs" variant="in_transit" pos={inTransitPos} />
+      )}
+      {activeTab === "scheduled" && (
+        <OperationalPoTable key={activeTab} title="Scheduled POs" variant="scheduled" pos={scheduledPos} />
       )}
       {activeTab === "cancelled" && (
-        <SecondaryPoTable key={activeTab} title="Cancelled POs" note="Read-only — kept for record." rows={cancelledRows} />
+        <OperationalPoTable key={activeTab} title="Cancelled POs" note="Read-only — kept for record." variant="cancelled" pos={cancelledPos} />
       )}
-      {activeTab === "expired" && <SecondaryPoTable key={activeTab} title="Expired POs" rows={expiredRows} />}
-      {activeTab === "needs_review" && (
-        <SecondaryPoTable
-          key={activeTab}
-          title="Needs Review — status not yet classified"
-          note="Price issue, Scheduled, Revised appt. required, etc. — not run through priority scoring until confirmed how they should be handled."
-          rows={needsReviewRows}
-        />
+      {activeTab === "low_value" && (
+        <OperationalPoTable key={activeTab} title="Low Value Can't Dispatch" variant="low_value_cant_dispatch" pos={lowValuePos} />
       )}
+      {activeTab === "needs_review" && <NeedsReviewPoTable key={activeTab} pos={needsReviewPos} />}
 
       {topSkuData && <DemandIntelligence marketplace={marketplace} data={topSkuData} />}
       <PoCharts rows={pendingRows} accentHex={accentHex} />

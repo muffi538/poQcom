@@ -7,7 +7,8 @@ import { SupportedMarketplace } from "@/lib/sheets/marketplaces";
 import { buildTopSkuTable } from "@/lib/demand/sku-table";
 import { buildExecutiveSummary } from "@/lib/dashboard/summary";
 import { buildPoRows } from "@/lib/dashboard/po-rows";
-import { classifyStatus, isFullyExcludedStatus, isLowValueCantDispatch, PurchaseOrder } from "@/types/purchase-order";
+import { buildDeliveredRows } from "@/lib/workflows/delivered-workflow";
+import { classifyOperationalStatus, isFullyExcludedStatus, PurchaseOrder } from "@/types/purchase-order";
 import { Rule } from "@/types/rules";
 import { EngineConfig } from "@/lib/config/engine-config";
 import { DemandIndex } from "@/lib/demand/rank";
@@ -23,6 +24,14 @@ function fmtDays(n: number | null): string {
 // useDateFilter's sessionStorage key) has to affect KPIs/tables/charts/
 // Demand Intelligence uniformly, so everything downstream of the raw
 // PurchaseOrder[] batch is recomputed here instead of once, server-side.
+//
+// Status-first routing (PO_Operations_Architecture_1.md): every visible
+// PO is classified into exactly one of 9 buckets via
+// classifyOperationalStatus, then handed to that bucket's own workflow.
+// Only "pending" and "expired" ever reach buildPoRows/computePoPriority
+// (the Priority Engine) — every other bucket gets a PurchaseOrder[] (or,
+// for Delivered, a DeliveredRow[]) with no score/rank field at all, so
+// there is no code path left that could accidentally score them.
 export function MarketplacePageClient({
   marketplace,
   pos,
@@ -43,25 +52,47 @@ export function MarketplacePageClient({
   const [dateFilter, setDateFilter] = useDateFilter();
   const hasRules = rules.some((r) => r.enabled);
 
-  const { summary, pendingRows, expiredRows, dispatchedRows, deliveredRows, cancelledRows, needsReviewRows, topSkuData } = useMemo(() => {
+  const {
+    summary,
+    pendingRows,
+    expiredRows,
+    deliveredRows,
+    dispatchedPos,
+    inTransitPos,
+    scheduledPos,
+    cancelledPos,
+    lowValuePos,
+    needsReviewPos,
+    topSkuData,
+  } = useMemo(() => {
     const filteredPos = filterPurchaseOrdersByDate(pos, dateFilter);
+    const today = new Date();
 
-    const visiblePos = filteredPos.filter((po) => !isFullyExcludedStatus(po.status) && !isLowValueCantDispatch(po.status));
-    const pendingPos = visiblePos.filter((po) => classifyStatus(po.status) === "pending");
-    const expiredPos = visiblePos.filter((po) => classifyStatus(po.status) === "expired");
-    const dispatchedPos = visiblePos.filter((po) => classifyStatus(po.status) === "dispatched");
-    const deliveredPos = visiblePos.filter((po) => classifyStatus(po.status) === "delivered");
-    const cancelledPos = visiblePos.filter((po) => classifyStatus(po.status) === "cancelled");
-    const needsReviewPos = visiblePos.filter((po) => classifyStatus(po.status) === "needs_review");
+    // RTO Done is a pre-filter, same as before this refactor — it's not
+    // one of the doc's 9 statuses and nobody's asked to see it.
+    const visiblePos = filteredPos.filter((po) => !isFullyExcludedStatus(po.status));
+    const byStatus = new Map<string, PurchaseOrder[]>();
+    for (const po of visiblePos) {
+      const bucket = classifyOperationalStatus(po, today);
+      const group = byStatus.get(bucket) ?? [];
+      group.push(po);
+      byStatus.set(bucket, group);
+    }
+    const pendingPos = byStatus.get("pending") ?? [];
+    const expiredPos = byStatus.get("expired") ?? [];
+    const deliveredPos = byStatus.get("delivered") ?? [];
 
     return {
       summary: buildExecutiveSummary(visiblePos, rules, config, demandIndex),
       pendingRows: buildPoRows(pendingPos, rules, config, demandIndex),
       expiredRows: buildPoRows(expiredPos, rules, config, demandIndex),
-      dispatchedRows: buildPoRows(dispatchedPos, rules, config, demandIndex),
-      deliveredRows: buildPoRows(deliveredPos, rules, config, demandIndex),
-      cancelledRows: buildPoRows(cancelledPos, rules, config, demandIndex),
-      needsReviewRows: buildPoRows(needsReviewPos, rules, config, demandIndex),
+      deliveredRows: buildDeliveredRows(deliveredPos),
+      dispatchedPos: byStatus.get("dispatched") ?? [],
+      inTransitPos: byStatus.get("in_transit") ?? [],
+      scheduledPos: byStatus.get("scheduled") ?? [],
+      cancelledPos: byStatus.get("cancelled") ?? [],
+      lowValuePos: byStatus.get("low_value_cant_dispatch") ?? [],
+      needsReviewPos: byStatus.get("needs_review") ?? [],
       topSkuData: buildTopSkuTable(marketplace as SupportedMarketplace, demandIndex, pendingPos),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -86,11 +117,14 @@ export function MarketplacePageClient({
       <MarketplaceTabbedView
         marketplace={marketplace}
         pendingRows={pendingRows}
-        deliveredRows={deliveredRows}
-        dispatchedRows={dispatchedRows}
-        cancelledRows={cancelledRows}
         expiredRows={expiredRows}
-        needsReviewRows={needsReviewRows}
+        deliveredRows={deliveredRows}
+        dispatchedPos={dispatchedPos}
+        inTransitPos={inTransitPos}
+        scheduledPos={scheduledPos}
+        cancelledPos={cancelledPos}
+        lowValuePos={lowValuePos}
+        needsReviewPos={needsReviewPos}
         hasRules={hasRules}
         demandError={demandError}
         topSkuData={topSkuData}
