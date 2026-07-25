@@ -56,20 +56,20 @@ type ColumnKey =
 // Date, Dispatch Date, Delivery Days, Dispatcher, Dispatched From,
 // Ordered Qty, Appointment Qty, Dispatched Qty, Fill Rate %, Value.
 const COLUMNS: Array<{ key: ColumnKey; label: string; width: number; numeric?: boolean }> = [
-  { key: "status", label: "Status", width: 84 },
-  { key: "marketplace", label: "Marketplace", width: 92 },
-  { key: "po", label: "PO Number", width: 130 },
-  { key: "city", label: "City", width: 100 },
-  { key: "poDate", label: "PO Date", width: 92 },
-  { key: "dispatchDate", label: "Dispatch Date", width: 92 },
-  { key: "fulfilmentDays", label: "Delivery Days", width: 90, numeric: true },
-  { key: "dispatcher", label: "Dispatcher", width: 110 },
-  { key: "dispatchedFrom", label: "Dispatched From", width: 110 },
-  { key: "orderedQty", label: "Ordered Qty", width: 80, numeric: true },
-  { key: "appointmentQty", label: "Appointment Qty", width: 90, numeric: true },
-  { key: "dispatchedQty", label: "Dispatched Qty", width: 100, numeric: true },
-  { key: "fillRate", label: "Fill Rate %", width: 80, numeric: true },
-  { key: "value", label: "Value", width: 96, numeric: true },
+  { key: "status", label: "Status", width: 90 },
+  { key: "marketplace", label: "Marketplace", width: 112 },
+  { key: "po", label: "PO Number", width: 132 },
+  { key: "city", label: "City", width: 104 },
+  { key: "poDate", label: "PO Date", width: 100 },
+  { key: "dispatchDate", label: "Dispatch Date", width: 118 },
+  { key: "fulfilmentDays", label: "Delivery Days", width: 110, numeric: true },
+  { key: "dispatcher", label: "Dispatcher", width: 116 },
+  { key: "dispatchedFrom", label: "Dispatched From", width: 142 },
+  { key: "orderedQty", label: "Ordered Qty", width: 98, numeric: true },
+  { key: "appointmentQty", label: "Appointment Qty", width: 128, numeric: true },
+  { key: "dispatchedQty", label: "Dispatched Qty", width: 132, numeric: true },
+  { key: "fillRate", label: "Fill Rate %", width: 98, numeric: true },
+  { key: "value", label: "Value", width: 100, numeric: true },
 ];
 
 // Ascending comparators — the click handler flips the sign for "desc".
@@ -132,6 +132,8 @@ export function DeliveredPoTable({ rows }: { rows: DeliveredRow[] }) {
   const [dispatchedFromFilter, setDispatchedFromFilter] = useState<string>("all");
   const [fillRateBucket, setFillRateBucket] = useState<FillRateBucket>("all");
   const [deliverySpeedBucket, setDeliverySpeedBucket] = useState<DeliverySpeedBucket>("all");
+  const [poDateFrom, setPoDateFrom] = useState<string>("");
+  const [poDateTo, setPoDateTo] = useState<string>("");
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<ColumnKey | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
@@ -155,6 +157,14 @@ export function DeliveredPoTable({ rows }: { rows: DeliveredRow[] }) {
       if (dispatchedFromFilter !== "all" && r.po.dispatchedFrom !== dispatchedFromFilter) return false;
       if (!matchesFillRateBucket(r.po.fillRate, fillRateBucket)) return false;
       if (!matchesDeliverySpeedBucket(r.po.fulfilmentDays, deliverySpeedBucket)) return false;
+      // PO Date range — ISO yyyy-mm-dd strings compare correctly as-is,
+      // no Date parsing needed. A PO with no poRaisedDate never matches a
+      // set range rather than being silently included.
+      if (poDateFrom || poDateTo) {
+        if (!r.po.poRaisedDate) return false;
+        if (poDateFrom && r.po.poRaisedDate < poDateFrom) return false;
+        if (poDateTo && r.po.poRaisedDate > poDateTo) return false;
+      }
       if (search.trim()) {
         const q = search.trim().toLowerCase();
         const haystack = [r.po.id, r.po.sku, r.po.dispatcherName, r.po.dispatchedFrom, r.po.shipmentId]
@@ -164,7 +174,7 @@ export function DeliveredPoTable({ rows }: { rows: DeliveredRow[] }) {
       }
       return true;
     });
-  }, [rows, cityFilter, marketplaceFilter, dispatcherFilter, dispatchedFromFilter, fillRateBucket, deliverySpeedBucket, search]);
+  }, [rows, cityFilter, marketplaceFilter, dispatcherFilter, dispatchedFromFilter, fillRateBucket, deliverySpeedBucket, poDateFrom, poDateTo, search]);
 
   const sorted = useMemo(() => {
     if (!sortKey) return filtered;
@@ -273,6 +283,36 @@ export function DeliveredPoTable({ rows }: { rows: DeliveredRow[] }) {
                 <option value="4to7">4–7 days</option>
                 <option value="gt7">&gt; 7 days</option>
               </select>
+              <div className="flex items-center gap-1">
+                <label className="text-[11px] text-neutral-500" htmlFor="delivered-po-date-from">
+                  PO Date
+                </label>
+                <input
+                  id="delivered-po-date-from"
+                  type="date"
+                  value={poDateFrom}
+                  onChange={(e) => setPoDateFrom(e.target.value)}
+                  className={`${inputClasses} w-[130px]`}
+                />
+                <span className="text-[11px] text-neutral-500">to</span>
+                <input
+                  type="date"
+                  value={poDateTo}
+                  onChange={(e) => setPoDateTo(e.target.value)}
+                  className={`${inputClasses} w-[130px]`}
+                />
+                {(poDateFrom || poDateTo) && (
+                  <button
+                    onClick={() => {
+                      setPoDateFrom("");
+                      setPoDateTo("");
+                    }}
+                    className="text-[11px] text-neutral-500 underline transition-colors hover:text-neutral-900 dark:hover:text-white"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
               <div className="relative">
                 <Search size={12} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-neutral-400" />
                 <input
@@ -312,20 +352,22 @@ export function DeliveredPoTable({ rows }: { rows: DeliveredRow[] }) {
             <thead className="sticky top-0 z-10 bg-white text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:bg-neutral-900">
               <tr className="border-b border-frido-border dark:border-white/10">
                 {COLUMNS.map((c) => (
-                  <th key={c.key} className="whitespace-nowrap px-1.5 py-1.5">
+                  <th key={c.key} className="overflow-hidden px-1.5 py-1.5">
                     <button
                       onClick={() => handleSort(c.key)}
-                      className="flex items-center gap-0.5 uppercase tracking-wide text-neutral-500 transition-colors hover:text-neutral-900 dark:hover:text-white"
+                      className="flex w-full items-center gap-0.5 overflow-hidden uppercase tracking-wide text-neutral-500 transition-colors hover:text-neutral-900 dark:hover:text-white"
                     >
-                      {c.label}
+                      <span className="truncate" title={c.label}>
+                        {c.label}
+                      </span>
                       {sortKey === c.key ? (
                         sortDir === "asc" ? (
-                          <ArrowUp size={11} />
+                          <ArrowUp size={11} className="shrink-0" />
                         ) : (
-                          <ArrowDown size={11} />
+                          <ArrowDown size={11} className="shrink-0" />
                         )
                       ) : (
-                        <ArrowUpDown size={11} className="opacity-30" />
+                        <ArrowUpDown size={11} className="shrink-0 opacity-30" />
                       )}
                     </button>
                   </th>
