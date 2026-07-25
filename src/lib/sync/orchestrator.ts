@@ -24,12 +24,22 @@ export interface SyncResult {
 interface Marketplace {
   id: string;
   name: string;
+  dispatchTag: string | null;
+  salesPlatformTag: string | null;
 }
 
 async function listMarketplaces(): Promise<Marketplace[]> {
-  const { data, error } = await supabase.from("marketplaces").select("id, name").eq("is_active", true);
+  const { data, error } = await supabase
+    .from("marketplaces")
+    .select("id, name, dispatch_tag, sales_platform_tag")
+    .eq("is_active", true);
   if (error) throw new Error(`Failed to load marketplaces: ${error.message}`);
-  return data ?? [];
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    name: row.name as string,
+    dispatchTag: row.dispatch_tag as string | null,
+    salesPlatformTag: row.sales_platform_tag as string | null,
+  }));
 }
 
 async function startSyncJob(params: { marketplaceId: string | null; jobType: string }): Promise<string> {
@@ -181,6 +191,7 @@ export async function syncSales(): Promise<SyncResult> {
       const result = await importSalesWorkbookRows({
         marketplaceId: marketplace.id,
         marketplaceName: marketplace.name,
+        platformTag: marketplace.salesPlatformTag,
         rawRows,
         salesUploadId: salesUpload.id as string,
       });
@@ -232,6 +243,7 @@ export async function syncDispatch(): Promise<SyncResult> {
       const result = await importDispatchWorkbookRows({
         marketplaceId: marketplace.id,
         marketplaceName: marketplace.name,
+        dispatchTag: marketplace.dispatchTag,
         rawRows,
       });
       totalUpdated += result.posUpdated;

@@ -62,6 +62,7 @@ export function computeTimeline(
     totalProcessingWindowDays,
     daysUsed,
     daysRemaining,
+    hasExpiryDate: expiryDateValid,
     operationalDelayDays,
     isOverdue,
     hasDataError,

@@ -26,6 +26,7 @@ export interface PoRow {
   score: number;
   level: "Critical" | "High" | "Medium" | "Low" | "Unscored";
   daysRemaining: number;
+  hasExpiryDate: boolean; // false for a blank/unparseable expiry date -- daysRemaining is meaningless (0) when this is false
   operationalDelayDays: number | null; // today − expiry; positive = days late
   isOverdue: boolean;
   hasDataError: boolean;
@@ -89,6 +90,7 @@ export function buildPoRows(
       score,
       level,
       daysRemaining: timeline.daysRemaining,
+      hasExpiryDate: timeline.hasExpiryDate,
       operationalDelayDays: timeline.operationalDelayDays,
       isOverdue: timeline.isOverdue,
       hasDataError: timeline.hasDataError,

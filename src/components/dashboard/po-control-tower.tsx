@@ -27,7 +27,16 @@ type SortKey =
 const SORTERS: Record<SortKey, (a: PoRow, b: PoRow) => number> = {
   priority: (a, b) => b.score - a.score,
   overdue: (a, b) => (b.operationalDelayDays ?? -Infinity) - (a.operationalDelayDays ?? -Infinity),
-  expiry: (a, b) => a.daysRemaining - b.daysRemaining,
+  // A row with no expiry date at all (BigBasket/Amazon Now) always sorts
+  // last here, regardless of direction — daysRemaining defaults to 0 for
+  // math-safety elsewhere, but that must never look like "expires today"
+  // in an expiry-ordered sort.
+  expiry: (a, b) => {
+    if (!a.hasExpiryDate && !b.hasExpiryDate) return 0;
+    if (!a.hasExpiryDate) return 1;
+    if (!b.hasExpiryDate) return -1;
+    return a.daysRemaining - b.daysRemaining;
+  },
   value: (a, b) => (b.po.poValue ?? -1) - (a.po.poValue ?? -1),
   qty: (a, b) => b.po.pendingQty - a.po.pendingQty,
   apptDelay: (a, b) => (b.appointmentDelayDays ?? -1) - (a.appointmentDelayDays ?? -1),
@@ -104,6 +113,7 @@ const inputClasses =
 // the confirmed toolbar filter set: City / Marketplace / Priority /
 // Expiry / Search).
 function matchesExpiryBucket(r: PoRow, bucket: string): boolean {
+  if (!r.hasExpiryDate) return bucket === "No Expiry Date";
   if (r.isOverdue) return bucket === "Overdue";
   if (r.daysRemaining === 0) return bucket === "Due Today";
   if (r.daysRemaining <= 3) return bucket === "≤3 Days";
@@ -178,7 +188,18 @@ export function PoControlTower({
   const today = new Date().toISOString().slice(0, 10);
   const cities = useMemo(() => Array.from(new Set(rows.map((r) => r.po.city))).sort(), [rows]);
   const levels = ["Critical", "High", "Medium", "Low", "Unscored"];
-  const expiryBuckets = ["Overdue", "Due Today", "≤3 Days", "≤7 Days", "8+ Days"];
+  // "No Expiry Date" only shows up when at least one row genuinely lacks
+  // one (e.g. BigBasket/Amazon Now) — no point cluttering the dropdown
+  // with an always-empty bucket for marketplaces that always have a date.
+  const hasAnyMissingExpiry = useMemo(() => rows.some((r) => !r.hasExpiryDate), [rows]);
+  const expiryBuckets = [
+    "Overdue",
+    "Due Today",
+    "≤3 Days",
+    "≤7 Days",
+    "8+ Days",
+    ...(hasAnyMissingExpiry ? ["No Expiry Date"] : []),
+  ];
 
   // Counts shown on each chip reflect the whole Pending queue, independent
   // of whatever else is currently filtered — so the number always answers
@@ -189,8 +210,8 @@ export function PoControlTower({
     {
       key: "expiringSoon",
       label: "Expiring ≤3d",
-      count: rows.filter((r) => !r.isOverdue && r.daysRemaining <= 3).length,
-      test: (r) => !r.isOverdue && r.daysRemaining <= 3,
+      count: rows.filter((r) => r.hasExpiryDate && !r.isOverdue && r.daysRemaining <= 3).length,
+      test: (r) => r.hasExpiryDate && !r.isOverdue && r.daysRemaining <= 3,
     },
     {
       key: "dispatchToday",

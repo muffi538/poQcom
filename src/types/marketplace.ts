@@ -2,13 +2,15 @@
 // code change once the sheet connector supports it. This list seeds the UI
 // (nav, dashboard tabs) until marketplaces can be registered from Settings.
 //
-// BigBasket is confirmed out of v1 scope: its sheet tab is structured as
-// one block per PO with its own SKU line-item sub-table, not a flat
-// one-row-per-PO layout like the other three, so it needs its own parser
-// before it can be added back.
-export const MARKETPLACES = ["Zepto", "Blinkit", "Instamart", "Flipkart Minutes"] as const;
-
-export const MARKETPLACES_COMING_SOON = ["BigBasket"] as const;
+// BigBasket and Amazon Now added 2026-07-25 (confirmed against their real
+// PO sheet tabs in the shared workbook). Both are structurally thinner
+// than Zepto/Blinkit/Instamart/Flipkart Minutes -- BigBasket's tab has no
+// PO Date/Expiry Date/City columns at all, and neither has an Expiry Date
+// column -- so Pending-workflow expiry scoring/city analytics are simply
+// unavailable for them (never fabricated), everything else (Delivered
+// workflow, dispatch matching, SKU demand analytics) works the same as
+// any other marketplace.
+export const MARKETPLACES = ["Zepto", "Blinkit", "Instamart", "Flipkart Minutes", "BigBasket", "Amazon Now"] as const;
 
 export type Marketplace = (typeof MARKETPLACES)[number] | (string & {});
 

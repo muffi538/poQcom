@@ -93,8 +93,9 @@ export const SEED_RULES: Rule[] = [
       join: "AND",
       children: [
         { id: "seed-metro-near-expiry-c1", field: "isMetroCity", operator: "equals", value: true },
-        { id: "seed-metro-near-expiry-c2", field: "daysRemaining", operator: "less_than_or_equal", value: 2 },
-        { id: "seed-metro-near-expiry-c3", field: "daysRemaining", operator: "greater_than_or_equal", value: 0 },
+        { id: "seed-metro-near-expiry-c2", field: "hasExpiryDate", operator: "equals", value: true },
+        { id: "seed-metro-near-expiry-c3", field: "daysRemaining", operator: "less_than_or_equal", value: 2 },
+        { id: "seed-metro-near-expiry-c4", field: "daysRemaining", operator: "greater_than_or_equal", value: 0 },
       ],
     },
     action: {

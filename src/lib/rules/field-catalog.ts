@@ -25,6 +25,11 @@ export const FIELD_CATALOG: FieldDefinition[] = [
   { key: "poValue", label: "PO Value", type: "number", source: "derived" },
 
   { key: "daysRemaining", label: "Days Remaining", type: "number", source: "derived" },
+  // False whenever a PO's own sheet carries no Expiry Date at all (e.g.
+  // BigBasket/Amazon Now) — daysRemaining defaults to 0 in that case for
+  // arithmetic safety elsewhere, so any rule keyed on daysRemaining should
+  // AND this in first to avoid treating "unknown" as "expires today".
+  { key: "hasExpiryDate", label: "Has Expiry Date", type: "boolean", source: "derived" },
   // SLA % consumed retired (confirmed misleading) — Operational Delay is
   // the replacement: today minus expiry date, for any non-Delivered PO
   // with a real expiry date. Positive = days late.

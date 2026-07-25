@@ -9,11 +9,19 @@ const EXPIRY_BUCKETS: Array<{ label: string; test: (days: number) => boolean }> 
   { label: "30+ days", test: (d) => d > 30 },
 ];
 
+// A blank expiry date (e.g. BigBasket/Amazon Now, whose real sheets carry
+// no Expiry Date column) must never fall into "0–3 days" just because
+// daysRemaining defaults to 0 for math-safety elsewhere — it gets its own
+// honest bucket instead of being silently mixed into "urgent" or dropped.
 export function expiryTimeline(rows: PoRow[]) {
-  return EXPIRY_BUCKETS.map((bucket) => ({
+  const withDate = rows.filter((r) => r.hasExpiryDate);
+  const withoutDate = rows.length - withDate.length;
+  const buckets = EXPIRY_BUCKETS.map((bucket) => ({
     label: bucket.label,
-    value: rows.filter((r) => bucket.test(r.daysRemaining)).length,
+    value: withDate.filter((r) => bucket.test(r.daysRemaining)).length,
   }));
+  if (withoutDate > 0) buckets.push({ label: "No Expiry Date", value: withoutDate });
+  return buckets;
 }
 
 export function poValueByMarketplace(rows: PoRow[]) {

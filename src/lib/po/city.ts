@@ -43,3 +43,12 @@ export function cityFromBlinkitFcName(fcName: string): string {
 export function cityFromInstamartFcName(fcName: string): string {
   return toTitleCase(fcName.trim());
 }
+
+// Amazon Now "Location" is "<facility code> - <City>, <STATE>", e.g.
+// "HKA2 - BENGALURU, KARNATAKA" or "HHR7 - Sonipat, HARYANA" (confirmed
+// against the real sheet, 2026-07-25).
+export function cityFromAmazonNowLocation(location: string): string {
+  const afterDash = location.split(" - ")[1]?.trim() ?? location;
+  const city = afterDash.split(",")[0]?.trim() ?? afterDash;
+  return toTitleCase(city || location);
+}

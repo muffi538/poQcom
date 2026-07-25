@@ -9,10 +9,11 @@
 
 // Flipkart Minutes added alongside Zepto/Blinkit/Instamart (confirmed:
 // behaves identically — same status routing, same priority engine, same
-// dashboard). BigBasket remains out of scope: its sheet tab is
-// structurally different (PO-per-block with SKU line items, not one row
-// per PO) and needs its own parser before it can be added back.
-export const SUPPORTED_MARKETPLACES = ["Zepto", "Blinkit", "Instamart", "Flipkart Minutes"] as const;
+// dashboard). BigBasket + Amazon Now added 2026-07-25 — see the comment
+// in src/types/marketplace.ts for what's structurally different about
+// their real sheets (no Expiry Date for either; BigBasket also has no
+// PO Date/City).
+export const SUPPORTED_MARKETPLACES = ["Zepto", "Blinkit", "Instamart", "Flipkart Minutes", "BigBasket", "Amazon Now"] as const;
 export type SupportedMarketplace = (typeof SUPPORTED_MARKETPLACES)[number];
 
 export interface TabConfig {
@@ -55,5 +56,19 @@ export const TAB_CONFIG: Record<SupportedMarketplace, TabConfig> = {
     minPoRaisedYear: 2026,
     autoDetectHeader: true,
     requiredColumns: ["Status", "PO number", "PO IssueDate", "Expiry Date", "City", "Location", "Total PO Qty", "FSN"],
+  },
+  // BigBasket + Amazon Now sync exclusively through the Data Sync page's
+  // Supabase-backed sheet_connections (never these env vars) -- these
+  // entries only exist to satisfy the Record type for Settings' legacy
+  // status card, which will correctly show them as "not configured" here.
+  BigBasket: {
+    gidEnvKey: "GOOGLE_SHEET_GID_BIGBASKET",
+    headerRowIndex: 1,
+    poNoColumn: "PO",
+  },
+  "Amazon Now": {
+    gidEnvKey: "GOOGLE_SHEET_GID_AMAZON_NOW",
+    headerRowIndex: 1,
+    poNoColumn: "PO Number",
   },
 };

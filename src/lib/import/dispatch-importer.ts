@@ -149,8 +149,15 @@ export async function importDispatchWorkbookRows(params: {
   marketplaceId: string;
   marketplaceName: string;
   rawRows: string[][];
+  // The sheet's own Marketplace column tag, when it doesn't literally
+  // equal marketplaceName (confirmed real case: the Dispatch workbook
+  // tags Amazon Now's rows "Amazon Now (Etrade)"). Null/undefined means
+  // "match marketplaceName directly", unchanged from before this param
+  // existed.
+  dispatchTag?: string | null;
 }): Promise<ImportDispatchResult> {
   const { marketplaceId, marketplaceName, rawRows } = params;
+  const matchTag = params.dispatchTag ?? marketplaceName;
 
   const mappings = await loadFieldMappings(marketplaceId, "dispatch");
   // Confirmed against the real "MP Dispatched Consignment Checklist"
@@ -213,7 +220,7 @@ export async function importDispatchWorkbookRows(params: {
   // which are marketplaces this dashboard tracks) is silently ignored,
   // same as sales-importer's Platform filter.
   const relevantRows = hasMarketplaceMapping
-    ? rowsByHeader.filter((row) => get(row, "marketplace").trim().toLowerCase() === marketplaceName.trim().toLowerCase())
+    ? rowsByHeader.filter((row) => get(row, "marketplace").trim().toLowerCase() === matchTag.trim().toLowerCase())
     : rowsByHeader;
 
   const lines = relevantRows.map((row) => ({
@@ -322,7 +329,7 @@ export async function importDispatchWorkbookRows(params: {
     if (touchedPoKeys.has(poKey)) continue; // enriched just now
     if (po.dispatcher_name) continue; // already enriched by a previous run
     unmatchedDeliveredPos.push(
-      diagnoseUnmatched(po.po_number as string, marketplaceName, sheetPoMarketplaceTags, sheetPoOccurrences, sheetRawValuesByKey, hasMarketplaceMapping)
+      diagnoseUnmatched(po.po_number as string, marketplaceName, matchTag, sheetPoMarketplaceTags, sheetPoOccurrences, sheetRawValuesByKey, hasMarketplaceMapping)
     );
   }
   logDiagnostics(marketplaceName, unmatchedDeliveredPos);
@@ -334,6 +341,7 @@ export async function importDispatchWorkbookRows(params: {
 function diagnoseUnmatched(
   rawPoNumber: string,
   marketplaceName: string,
+  matchTag: string,
   sheetPoMarketplaceTags: Map<string, Set<string>>,
   sheetPoOccurrences: Map<string, number>,
   sheetRawValuesByKey: Map<string, Set<string>>,
@@ -352,12 +360,13 @@ function diagnoseUnmatched(
       detail: "PO missing from Dispatch Workbook — not present anywhere in the sheet.",
     };
   }
-  if (hasMarketplaceMapping && tags && !tags.has(marketplaceName)) {
+  if (hasMarketplaceMapping && tags && !tags.has(matchTag)) {
+    const expected = matchTag === marketplaceName ? `"${marketplaceName}"` : `"${matchTag}" (this marketplace's Dispatch tag)`;
     return {
       poNumber: rawPoNumber,
       marketplace: marketplaceName,
       reason: "marketplace_mismatch",
-      detail: `Present in the sheet, but tagged as Marketplace = ${[...tags].join(", ")}, not "${marketplaceName}".`,
+      detail: `Present in the sheet, but tagged as Marketplace = ${[...tags].join(", ")}, not ${expected}.`,
     };
   }
   if (occurrences > 1) {

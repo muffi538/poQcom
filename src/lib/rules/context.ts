@@ -19,6 +19,7 @@ export function buildEvalContext(po: PurchaseOrder, timeline: PoTimeline): EvalC
     pendingQty: po.pendingQty,
     poValue: po.poValue,
     daysRemaining: timeline.daysRemaining,
+    hasExpiryDate: timeline.hasExpiryDate,
     operationalDelayDays: timeline.operationalDelayDays,
     isOverdue: timeline.isOverdue,
     appointmentDelayDays: timeline.appointmentDelayDays,

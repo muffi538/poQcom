@@ -189,7 +189,8 @@ export function classifyOperationalStatus(po: PurchaseOrder, today: Date = new D
 export interface PoTimeline {
   totalProcessingWindowDays: number;
   daysUsed: number;
-  daysRemaining: number; // expiryDate − today; negative once overdue
+  daysRemaining: number; // expiryDate − today; negative once overdue. Meaningless (0) when hasExpiryDate is false -- always check that flag before treating this as real.
+  hasExpiryDate: boolean; // false when expiryDate is blank/unparseable -- e.g. BigBasket/Amazon Now, whose real sheets carry no Expiry Date column at all
   // today − expiryDate, only computed for non-Delivered POs with a valid
   // expiry date; null when Delivered or expiry date is blank/unparseable
   // ("Unknown" in the UI). Positive = days late, 0 = due today, negative

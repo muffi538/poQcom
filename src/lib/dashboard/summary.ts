@@ -85,8 +85,8 @@ export function buildExecutiveSummary(
         unscored++;
     }
 
-    if (timeline.daysRemaining === 0) expiringToday++;
-    if (timeline.daysRemaining === 1) expiringTomorrow++;
+    if (timeline.hasExpiryDate && timeline.daysRemaining === 0) expiringToday++;
+    if (timeline.hasExpiryDate && timeline.daysRemaining === 1) expiringTomorrow++;
     if (timeline.isOverdue) {
       expiredPending++;
       if (timeline.operationalDelayDays !== null) operationalDelaysLate.push(timeline.operationalDelayDays);

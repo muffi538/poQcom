@@ -18,8 +18,13 @@ export const MARKETPLACE_THEMES: Record<string, MarketplaceTheme> = {
   Myntra: { primary: "#FF3F6C", accent: "#FF7096" },
   // Confirmed: dark blue (not Amazon's real orange/black branding) —
   // deliberate design-system choice for this dashboard's marketplace
-  // color set, not a copy of the marketplace's own brand.
+  // color set, not a copy of the marketplace's own brand. Amazon Now
+  // reuses the same scheme, same reasoning.
   Amazon: { primary: "#1B3A5C", accent: "#3B5A78" },
+  "Amazon Now": { primary: "#1B3A5C", accent: "#3B5A78" },
+  // BigBasket's real logo green — a reasonable brand-adjacent pick (same
+  // spirit as Myntra/FBF above), not a strict trademark match.
+  BigBasket: { primary: "#84C225", accent: "#A8D65C" },
   FBF: { primary: "#00A86B", accent: "#00A86B" },
   "E-Trade": { primary: "#0099FF", accent: "#0099FF" },
 };

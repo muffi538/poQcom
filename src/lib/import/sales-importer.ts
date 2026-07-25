@@ -20,8 +20,14 @@ export async function importSalesWorkbookRows(params: {
   marketplaceName: string;
   rawRows: string[][];
   salesUploadId: string;
+  // The sheet's own Platform column tag, when it doesn't literally equal
+  // marketplaceName (confirmed real case: the Sales workbook tags
+  // BigBasket's rows "BB Now"). Null/undefined means "match
+  // marketplaceName directly", unchanged from before this param existed.
+  platformTag?: string | null;
 }): Promise<ImportSalesResult> {
   const { marketplaceId, marketplaceName, rawRows, salesUploadId } = params;
+  const matchTag = params.platformTag ?? marketplaceName;
 
   const mappings = await loadFieldMappings(marketplaceId, "sales");
   const rowsByHeader = extractRowsByHeader(rawRows, mappings, marketplaceName);
@@ -34,14 +40,19 @@ export async function importSalesWorkbookRows(params: {
 
   const hasPlatformMapping = byField.has("platform");
   const relevantRows = hasPlatformMapping
-    ? rowsByHeader.filter((row) => get(row, "platform").trim().toLowerCase() === marketplaceName.trim().toLowerCase())
+    ? rowsByHeader.filter((row) => get(row, "platform").trim().toLowerCase() === matchTag.trim().toLowerCase())
     : rowsByHeader;
 
   const records = relevantRows
     .map((row) => ({
       sales_upload_id: salesUploadId,
       marketplace_id: marketplaceId,
-      platform: get(row, "platform") || marketplaceName,
+      // Always the canonical marketplace name, never the sheet's own raw
+      // tag (which may differ, e.g. "BB Now") -- this is what downstream
+      // demand/rank.ts matches against, and it must agree with
+      // marketplace_id rather than carry a second, possibly-divergent
+      // spelling of the same marketplace.
+      platform: marketplaceName,
       category: get(row, "category") || null,
       sub_category: get(row, "sub_category") || null,
       master_sku: get(row, "master_sku"),
