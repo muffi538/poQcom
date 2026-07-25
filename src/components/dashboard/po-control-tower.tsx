@@ -57,7 +57,6 @@ const COL = {
   priority: 92,
   poNumber: 112,
   marketplace: 84,
-  score: 46,
   city: 88,
   fc: 150,
   qty: 60,
@@ -78,7 +77,6 @@ const EXPORT_HEADERS = [
   "Priority",
   "PO Number",
   "Marketplace",
-  "Score",
   "City",
   "FC / Warehouse",
   "Pending Qty",
@@ -261,7 +259,6 @@ export function PoControlTower({
         r.level,
         r.po.id,
         r.po.marketplace,
-        r.score,
         r.po.city,
         r.po.warehouse,
         r.po.pendingQty,
@@ -350,7 +347,6 @@ export function PoControlTower({
               <col style={{ width: COL.priority }} />
               <col style={{ width: COL.poNumber }} />
               <col style={{ width: COL.marketplace }} />
-              <col style={{ width: COL.score }} />
               <col style={{ width: COL.city }} />
               <col style={{ width: COL.fc }} />
               <col style={{ width: COL.qty }} />
@@ -377,7 +373,6 @@ export function PoControlTower({
                 >
                   Mkt
                 </th>
-                <th className="px-1.5 py-1.5">Score</th>
                 <th className="px-1.5 py-1.5">City</th>
                 <th className="px-1.5 py-1.5">FC</th>
                 <th className="px-1.5 py-1.5 text-right">Qty</th>
@@ -440,7 +435,6 @@ export function PoControlTower({
                         <MarketplaceBadge marketplace={r.po.marketplace} compact />
                       </div>
                     </td>
-                    <td className="px-1.5 tabular-nums font-medium">{r.score}</td>
                     <td className="truncate px-1.5" title={r.po.city}>
                       {r.po.city}
                     </td>
