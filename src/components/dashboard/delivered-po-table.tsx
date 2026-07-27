@@ -10,6 +10,7 @@ import { ExportButton } from "./export-button";
 import { CsvCell } from "@/lib/export/csv";
 import { WorkflowDetailPanel } from "./workflow-detail-panel";
 import { KpiCard } from "./kpi-card";
+import { PoDateRangeFilter } from "./po-date-range-filter";
 
 const inputClasses =
   "rounded-lg border border-frido-border bg-white px-2 py-1 text-xs shadow-sm outline-none transition-colors focus:border-[var(--mp-accent)] dark:border-white/10 dark:bg-neutral-900";
@@ -283,36 +284,7 @@ export function DeliveredPoTable({ rows }: { rows: DeliveredRow[] }) {
                 <option value="4to7">4–7 days</option>
                 <option value="gt7">&gt; 7 days</option>
               </select>
-              <div className="flex items-center gap-1">
-                <label className="text-[11px] text-neutral-500" htmlFor="delivered-po-date-from">
-                  PO Date
-                </label>
-                <input
-                  id="delivered-po-date-from"
-                  type="date"
-                  value={poDateFrom}
-                  onChange={(e) => setPoDateFrom(e.target.value)}
-                  className={`${inputClasses} w-[130px]`}
-                />
-                <span className="text-[11px] text-neutral-500">to</span>
-                <input
-                  type="date"
-                  value={poDateTo}
-                  onChange={(e) => setPoDateTo(e.target.value)}
-                  className={`${inputClasses} w-[130px]`}
-                />
-                {(poDateFrom || poDateTo) && (
-                  <button
-                    onClick={() => {
-                      setPoDateFrom("");
-                      setPoDateTo("");
-                    }}
-                    className="text-[11px] text-neutral-500 underline transition-colors hover:text-neutral-900 dark:hover:text-white"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
+              <PoDateRangeFilter idPrefix="delivered" from={poDateFrom} to={poDateTo} onFromChange={setPoDateFrom} onToChange={setPoDateTo} />
               <div className="relative">
                 <Search size={12} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-neutral-400" />
                 <input

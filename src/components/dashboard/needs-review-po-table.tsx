@@ -9,6 +9,7 @@ import { fmtDate, fmtCurrency } from "./po-format";
 import { ExportButton } from "./export-button";
 import { CsvCell } from "@/lib/export/csv";
 import { WorkflowDetailPanel } from "./workflow-detail-panel";
+import { PoDateRangeFilter } from "./po-date-range-filter";
 
 const inputClasses =
   "rounded-lg border border-frido-border bg-white px-2 py-1 text-xs shadow-sm outline-none transition-colors focus:border-[var(--mp-accent)] dark:border-white/10 dark:bg-neutral-900";
@@ -33,6 +34,8 @@ export function NeedsReviewPoTable({
 }) {
   const [selected, setSelected] = useState<PurchaseOrder | null>(null);
   const [cityFilter, setCityFilter] = useState<string>("all");
+  const [poDateFrom, setPoDateFrom] = useState<string>("");
+  const [poDateTo, setPoDateTo] = useState<string>("");
   const [search, setSearch] = useState("");
 
   const cities = useMemo(() => Array.from(new Set(pos.map((po) => po.city))).filter(Boolean).sort(), [pos]);
@@ -40,13 +43,16 @@ export function NeedsReviewPoTable({
   const filtered = useMemo(() => {
     return pos.filter((po) => {
       if (cityFilter !== "all" && po.city !== cityFilter) return false;
+      // ISO yyyy-mm-dd strings compare correctly as-is.
+      if (poDateFrom && po.poRaisedDate < poDateFrom) return false;
+      if (poDateTo && po.poRaisedDate > poDateTo) return false;
       if (search.trim()) {
         const q = search.trim().toLowerCase();
         if (!po.id.toLowerCase().includes(q) && !po.sku.toLowerCase().includes(q)) return false;
       }
       return true;
     });
-  }, [pos, cityFilter, search]);
+  }, [pos, cityFilter, poDateFrom, poDateTo, search]);
 
   const exportRows: CsvCell[][] = filtered.map((po) => [
     po.status,
@@ -81,6 +87,7 @@ export function NeedsReviewPoTable({
                   ))}
                 </select>
               )}
+              <PoDateRangeFilter idPrefix="needs-review" from={poDateFrom} to={poDateTo} onFromChange={setPoDateFrom} onToChange={setPoDateTo} />
               <div className="relative">
                 <Search size={12} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-neutral-400" />
                 <input

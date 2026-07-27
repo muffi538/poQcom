@@ -7,6 +7,7 @@ import { fmtDate } from "./po-format";
 import { ExportButton } from "./export-button";
 import { CsvCell } from "@/lib/export/csv";
 import { WorkflowDetailPanel } from "./workflow-detail-panel";
+import { PoDateRangeFilter } from "./po-date-range-filter";
 
 export type OperationalVariant = "dispatched" | "in_transit" | "scheduled" | "cancelled" | "low_value_cant_dispatch";
 
@@ -124,6 +125,8 @@ export function OperationalPoTable({
 }) {
   const [selected, setSelected] = useState<PurchaseOrder | null>(null);
   const [cityFilter, setCityFilter] = useState<string>("all");
+  const [poDateFrom, setPoDateFrom] = useState<string>("");
+  const [poDateTo, setPoDateTo] = useState<string>("");
   const [search, setSearch] = useState("");
 
   const columns = VARIANT_COLUMNS[variant];
@@ -132,13 +135,16 @@ export function OperationalPoTable({
   const filtered = useMemo(() => {
     return pos.filter((po) => {
       if (cityFilter !== "all" && po.city !== cityFilter) return false;
+      // ISO yyyy-mm-dd strings compare correctly as-is.
+      if (poDateFrom && po.poRaisedDate < poDateFrom) return false;
+      if (poDateTo && po.poRaisedDate > poDateTo) return false;
       if (search.trim()) {
         const q = search.trim().toLowerCase();
         if (!po.id.toLowerCase().includes(q) && !po.sku.toLowerCase().includes(q)) return false;
       }
       return true;
     });
-  }, [pos, cityFilter, search]);
+  }, [pos, cityFilter, poDateFrom, poDateTo, search]);
 
   const exportRows: CsvCell[][] = filtered.map((po) => columns.map((c) => c.csv(po)));
 
@@ -164,6 +170,7 @@ export function OperationalPoTable({
                   ))}
                 </select>
               )}
+              <PoDateRangeFilter idPrefix={`${variant}-op`} from={poDateFrom} to={poDateTo} onFromChange={setPoDateFrom} onToChange={setPoDateTo} />
               <div className="relative">
                 <Search size={12} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-neutral-400" />
                 <input

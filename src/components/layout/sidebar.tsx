@@ -47,7 +47,7 @@ function NavItem({
       className={`group flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[13px] font-medium transition-colors ${
         active
           ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
-          : "text-neutral-600 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
+          : "text-white/85 hover:bg-white/10 dark:text-neutral-400 dark:hover:bg-neutral-800"
       }`}
     >
       {Icon ? (
@@ -69,7 +69,7 @@ export function Sidebar() {
 
   return (
     <aside
-      className={`sticky top-0 flex h-screen shrink-0 flex-col border-r border-frido-border bg-white transition-[width] duration-200 dark:border-white/10 dark:bg-neutral-950 ${
+      className={`sticky top-0 flex h-screen shrink-0 flex-col border-r border-black/10 bg-frido-sidebar transition-[width] duration-200 dark:border-white/10 dark:bg-neutral-950 ${
         collapsed ? "w-12" : "w-44"
       }`}
     >
@@ -79,8 +79,8 @@ export function Sidebar() {
         </span>
         {!collapsed && (
           <div className="leading-tight">
-            <div className="text-[13px] font-semibold">Frido</div>
-            <div className="text-[10px] text-neutral-500">Control Tower</div>
+            <div className="text-[13px] font-semibold text-white dark:text-neutral-100">Frido</div>
+            <div className="text-[10px] text-white/70 dark:text-neutral-500">Control Tower</div>
           </div>
         )}
       </div>
@@ -91,7 +91,7 @@ export function Sidebar() {
         ))}
 
         {!collapsed && (
-          <div className="px-2.5 pb-0.5 pt-3 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
+          <div className="px-2.5 pb-0.5 pt-3 text-[10px] font-semibold uppercase tracking-wide text-white/60 dark:text-neutral-400">
             Marketplaces
           </div>
         )}
@@ -110,7 +110,7 @@ export function Sidebar() {
         })}
 
         {!collapsed && (
-          <div className="px-2.5 pb-0.5 pt-3 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
+          <div className="px-2.5 pb-0.5 pt-3 text-[10px] font-semibold uppercase tracking-wide text-white/60 dark:text-neutral-400">
             Tools
           </div>
         )}
@@ -123,7 +123,7 @@ export function Sidebar() {
         <ThemeToggle collapsed={collapsed} />
         <button
           onClick={() => setCollapsed((c) => !c)}
-          className="flex w-full items-center justify-center gap-2 rounded-md border border-frido-border py-1.5 text-xs text-neutral-500 transition-colors hover:bg-neutral-50 dark:border-white/10 dark:hover:bg-neutral-900"
+          className="flex w-full items-center justify-center gap-2 rounded-md border border-white/20 py-1.5 text-xs text-white/80 transition-colors hover:bg-white/10 dark:border-white/10 dark:text-neutral-500 dark:hover:bg-neutral-900"
         >
           {collapsed ? <ChevronsRight size={16} /> : <ChevronsLeft size={16} />}
           {!collapsed && "Collapse"}

@@ -10,6 +10,7 @@ import { OperationalDelayBadge } from "./operational-delay";
 import { fmtDate, fmtCurrency } from "./po-format";
 import { ExportButton } from "./export-button";
 import { CsvCell } from "@/lib/export/csv";
+import { PoDateRangeFilter } from "./po-date-range-filter";
 
 const EXPORT_HEADERS = ["Status", "Marketplace", "PO Number", "City", "PO Date", "Expiry Date", "Pending Qty", "PO Value", "Operational Delay (days)"];
 
@@ -34,6 +35,8 @@ export function SecondaryPoTable({
 }) {
   const [selected, setSelected] = useState<PoRow | null>(null);
   const [cityFilter, setCityFilter] = useState<string>("all");
+  const [poDateFrom, setPoDateFrom] = useState<string>("");
+  const [poDateTo, setPoDateTo] = useState<string>("");
   const [search, setSearch] = useState("");
 
   const cities = useMemo(() => Array.from(new Set(rows.map((r) => r.po.city))).sort(), [rows]);
@@ -41,13 +44,16 @@ export function SecondaryPoTable({
   const filteredRows = useMemo(() => {
     return rows.filter((r) => {
       if (cityFilter !== "all" && r.po.city !== cityFilter) return false;
+      // ISO yyyy-mm-dd strings compare correctly as-is.
+      if (poDateFrom && r.po.poRaisedDate < poDateFrom) return false;
+      if (poDateTo && r.po.poRaisedDate > poDateTo) return false;
       if (search.trim()) {
         const q = search.trim().toLowerCase();
         if (!r.po.id.toLowerCase().includes(q) && !r.po.sku.toLowerCase().includes(q)) return false;
       }
       return true;
     });
-  }, [rows, cityFilter, search]);
+  }, [rows, cityFilter, poDateFrom, poDateTo, search]);
 
   const exportRows: CsvCell[][] = filteredRows.map((r) => [
     r.po.status,
@@ -81,6 +87,7 @@ export function SecondaryPoTable({
                   </option>
                 ))}
               </select>
+              <PoDateRangeFilter idPrefix="expired" from={poDateFrom} to={poDateTo} onFromChange={setPoDateFrom} onToChange={setPoDateTo} />
               <div className="relative">
                 <Search size={12} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-neutral-400" />
                 <input
