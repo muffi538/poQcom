@@ -48,6 +48,20 @@ const VARIANTS = {
     centerTotal: "text-2xl",
     centerLabel: "mt-1 text-[11px]",
   },
+  // The single donut beside a marketplace page's 2-row KPI grid — bigger
+  // than "large" (which shares its width with a second donut on
+  // Overview) since here it's the sole thing filling that whole column.
+  xlarge: {
+    size: 148,
+    stroke: 21,
+    wrapper: "h-full w-full justify-center gap-8 px-8 py-6",
+    legendCols: "grid-cols-1",
+    gridGap: "gap-y-3",
+    legendItem: "w-full gap-2.5 whitespace-nowrap px-2 py-1.5 text-base",
+    legendDot: "h-3.5 w-3.5",
+    centerTotal: "text-4xl",
+    centerLabel: "mt-1.5 text-sm",
+  },
 } as const;
 
 export function PriorityDonutChart({
@@ -59,16 +73,17 @@ export function PriorityDonutChart({
   counts: Record<Level, number>;
   activeLevel: string;
   onSelectLevel: (level: Level) => void;
-  variant?: "compact" | "large";
+  variant?: "compact" | "large" | "xlarge";
 }) {
   const v = VARIANTS[variant];
   const radius = (v.size - v.stroke) / 2;
   const circumference = 2 * Math.PI * radius;
   const total = LEVELS.reduce((sum, l) => sum + counts[l], 0);
+  const stretches = variant === "large" || variant === "xlarge";
 
   if (total === 0) {
     return (
-      <div className={`glass-card flex items-center justify-center rounded-card px-3 text-xs text-neutral-500 ${variant === "large" ? "h-full w-full py-4" : "w-fit py-1"}`}>
+      <div className={`glass-card flex items-center justify-center rounded-card px-3 text-xs text-neutral-500 ${stretches ? "h-full w-full py-4" : "w-fit py-1"}`}>
         No Pending POs match the current filters.
       </div>
     );

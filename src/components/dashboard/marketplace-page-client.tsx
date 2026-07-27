@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { KpiCard } from "@/components/dashboard/kpi-card";
+import { PriorityDonutChart } from "@/components/dashboard/priority-donut-chart";
 import { MarketplaceTabbedView } from "@/components/dashboard/marketplace-tabbed-view";
+import { computeLevelCounts } from "@/lib/dashboard/po-control-filters";
 import { SupportedMarketplace } from "@/lib/sheets/marketplaces";
 import { buildTopSkuTable } from "@/lib/demand/sku-table";
 import { buildExecutiveSummary } from "@/lib/dashboard/summary";
@@ -49,6 +51,10 @@ export function MarketplacePageClient({
 }) {
   const [dateFilter, setDateFilter] = useDateFilter();
   const hasRules = rules.some((r) => r.enabled);
+  // Purely a visual highlight within the donut itself — unlike Overview,
+  // this doesn't filter the table below (that table has its own
+  // Priority filter, already reachable from its own toolbar/donut).
+  const [donutActiveLevel, setDonutActiveLevel] = useState("all");
 
   const {
     summary,
@@ -102,20 +108,35 @@ export function MarketplacePageClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pos, rules, config, demandIndex, dateFilter, marketplace]);
 
+  // Same "big picture" scope as the KPI cards beside it (buildExecutiveSummary
+  // over every visible Pending PO for this marketplace) — not reactive to
+  // the table's own toolbar filters below, same as those KPI numbers aren't.
+  const levelCounts = useMemo(() => computeLevelCounts(pendingRows), [pendingRows]);
+
   return (
     <>
-      <div className="grid shrink-0 grid-cols-2 gap-1.5 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
-        <KpiCard label="Pending Orders" value={summary.totalActive} tone="accent" />
-        <KpiCard label="Expired Pending" value={summary.expiredPending} tone="critical" />
-        <KpiCard label="Pending Qty" value={summary.pendingQty} tone="accent" />
-        <KpiCard label="Avg Dispatch" value={fmtDays(summary.avgDispatchTimeDays)} tone="accent" />
-        <KpiCard label="Avg Appt Delay" value={fmtDays(summary.avgAppointmentDelayDays)} tone="accent" />
-        <KpiCard
-          label="Avg Days Late"
-          value={summary.avgOperationalDelayDaysLate === null ? "—" : `${summary.avgOperationalDelayDaysLate.toFixed(1)}d`}
-          tone="critical"
-        />
-        <KpiCard label="Risk (Crit+High)" value={summary.critical + summary.high} tone="critical" />
+      <div className="flex shrink-0 items-stretch gap-2">
+        <div className="grid flex-1 grid-cols-3 gap-2">
+          <KpiCard label="Pending Orders" value={summary.totalActive} tone="accent" />
+          <KpiCard label="Expired Pending" value={summary.expiredPending} tone="critical" />
+          <KpiCard label="Pending Qty" value={summary.pendingQty} tone="accent" />
+          <KpiCard label="Avg Dispatch" value={fmtDays(summary.avgDispatchTimeDays)} tone="accent" />
+          <KpiCard label="Avg Appt Delay" value={fmtDays(summary.avgAppointmentDelayDays)} tone="accent" />
+          <KpiCard
+            label="Avg Days Late"
+            value={summary.avgOperationalDelayDaysLate === null ? "—" : `${summary.avgOperationalDelayDaysLate.toFixed(1)}d`}
+            tone="critical"
+          />
+        </div>
+
+        <div className="w-[480px] shrink-0">
+          <PriorityDonutChart
+            counts={levelCounts}
+            activeLevel={donutActiveLevel}
+            onSelectLevel={(level) => setDonutActiveLevel(level === donutActiveLevel ? "all" : level)}
+            variant="xlarge"
+          />
+        </div>
       </div>
 
       <MarketplaceTabbedView
