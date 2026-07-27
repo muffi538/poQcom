@@ -11,7 +11,6 @@ import { DeliveredPoTable } from "./delivered-po-table";
 import { OperationalPoTable } from "./operational-po-table";
 import { NeedsReviewPoTable } from "./needs-review-po-table";
 import { DemandIntelligence } from "./demand-intelligence";
-import { PoCharts } from "./po-charts";
 import { TopSkuTableResult } from "@/lib/demand/sku-table";
 import { DateFilterState } from "@/lib/dashboard/date-filter";
 
@@ -62,7 +61,6 @@ export function MarketplaceTabbedView({
   hasRules,
   demandError,
   topSkuData,
-  accentHex,
   dateFilter,
   onDateFilterChange,
 }: {
@@ -79,7 +77,6 @@ export function MarketplaceTabbedView({
   hasRules: boolean;
   demandError?: string | null;
   topSkuData: TopSkuTableResult | null;
-  accentHex: string;
   dateFilter?: DateFilterState;
   onDateFilterChange?: (next: DateFilterState) => void;
 }) {
@@ -174,7 +171,6 @@ export function MarketplaceTabbedView({
       {activeTab === "needs_review" && <NeedsReviewPoTable key={activeTab} pos={needsReviewPos} />}
 
       {topSkuData && <DemandIntelligence marketplace={marketplace} data={topSkuData} />}
-      <PoCharts rows={pendingRows} accentHex={accentHex} />
     </div>
   );
 }

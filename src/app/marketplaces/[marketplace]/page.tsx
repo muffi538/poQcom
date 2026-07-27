@@ -75,7 +75,6 @@ export default async function MarketplacePage({
             config={config}
             demandIndex={demandIndex}
             demandError={demandError}
-            accentHex={theme.primary}
           />
         )}
       </div>

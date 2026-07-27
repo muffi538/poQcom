@@ -39,7 +39,6 @@ export function MarketplacePageClient({
   config,
   demandIndex,
   demandError,
-  accentHex,
 }: {
   marketplace: string;
   pos: PurchaseOrder[];
@@ -47,7 +46,6 @@ export function MarketplacePageClient({
   config: EngineConfig;
   demandIndex: DemandIndex;
   demandError: string | null;
-  accentHex: string;
 }) {
   const [dateFilter, setDateFilter] = useDateFilter();
   const hasRules = rules.some((r) => r.enabled);
@@ -128,7 +126,6 @@ export function MarketplacePageClient({
         hasRules={hasRules}
         demandError={demandError}
         topSkuData={topSkuData}
-        accentHex={accentHex}
         dateFilter={dateFilter}
         onDateFilterChange={setDateFilter}
       />

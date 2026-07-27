@@ -60,10 +60,10 @@ const COLUMNS: Array<{ key: ColumnKey; label: string; width: number; numeric?: b
   { key: "status", label: "Status", width: 90 },
   { key: "marketplace", label: "Marketplace", width: 112 },
   { key: "po", label: "PO Number", width: 132 },
+  { key: "fulfilmentDays", label: "Delivery Days", width: 110, numeric: true },
   { key: "city", label: "City", width: 104 },
   { key: "poDate", label: "PO Date", width: 100 },
   { key: "dispatchDate", label: "Dispatch Date", width: 118 },
-  { key: "fulfilmentDays", label: "Delivery Days", width: 110, numeric: true },
   { key: "dispatcher", label: "Dispatcher", width: 116 },
   { key: "dispatchedFrom", label: "Dispatched From", width: 142 },
   { key: "orderedQty", label: "Ordered Qty", width: 98, numeric: true },
@@ -362,12 +362,12 @@ export function DeliveredPoTable({ rows }: { rows: DeliveredRow[] }) {
                   <td className="truncate px-1.5 font-medium" title={r.po.id}>
                     {r.po.id}
                   </td>
+                  <td className="px-1.5 font-semibold tabular-nums">{r.po.fulfilmentDays === null ? "—" : `${r.po.fulfilmentDays}d`}</td>
                   <td className="truncate px-1.5 text-neutral-500" title={r.po.city}>
                     {r.po.city}
                   </td>
                   <td className="whitespace-nowrap px-1.5 text-neutral-500">{fmtDate(r.po.poRaisedDate)}</td>
                   <td className="whitespace-nowrap px-1.5 text-neutral-500">{fmtDate(r.po.dispatchDate)}</td>
-                  <td className="px-1.5 font-semibold tabular-nums">{r.po.fulfilmentDays === null ? "—" : `${r.po.fulfilmentDays}d`}</td>
                   <td className="truncate px-1.5" title={r.po.dispatcherName ?? undefined}>
                     {r.po.dispatcherName ?? "—"}
                   </td>
