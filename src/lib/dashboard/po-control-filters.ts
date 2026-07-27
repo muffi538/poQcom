@@ -10,7 +10,6 @@ export interface PoControlFilters {
   marketplaceFilter: string;
   cityFilter: string;
   levelFilter: string;
-  expiryFilter: string;
   search: string;
 }
 
@@ -18,34 +17,19 @@ export const DEFAULT_PO_CONTROL_FILTERS: PoControlFilters = {
   marketplaceFilter: "all",
   cityFilter: "all",
   levelFilter: "all",
-  expiryFilter: "all",
   search: "",
 };
-
-// Single-select Expiry bucket for the toolbar dropdown — distinct from
-// any OR-able quick-filter chips; this picks exactly one bucket at a
-// time, per the confirmed toolbar filter set: City / Marketplace /
-// Priority / Expiry / Search.
-export function matchesExpiryBucket(r: PoRow, bucket: string): boolean {
-  if (!r.hasExpiryDate) return bucket === "No Expiry Date";
-  if (r.isOverdue) return bucket === "Overdue";
-  if (r.daysRemaining === 0) return bucket === "Due Today";
-  if (r.daysRemaining <= 3) return bucket === "≤3 Days";
-  if (r.daysRemaining <= 7) return bucket === "≤7 Days";
-  return bucket === "8+ Days";
-}
 
 // Everything except the level/priority filter — the donut chart needs
 // this so all four priority slices stay visible (and clickable) even
 // once one is selected, instead of collapsing to a single 100% slice.
 export function filterRowsExceptLevel(
   rows: PoRow[],
-  f: Pick<PoControlFilters, "marketplaceFilter" | "cityFilter" | "expiryFilter" | "search">
+  f: Pick<PoControlFilters, "marketplaceFilter" | "cityFilter" | "search">
 ): PoRow[] {
   return rows.filter((r) => {
     if (f.marketplaceFilter !== "all" && r.po.marketplace !== f.marketplaceFilter) return false;
     if (f.cityFilter !== "all" && r.po.city !== f.cityFilter) return false;
-    if (f.expiryFilter !== "all" && !matchesExpiryBucket(r, f.expiryFilter)) return false;
     if (f.search.trim()) {
       const q = f.search.trim().toLowerCase();
       if (!r.po.id.toLowerCase().includes(q) && !r.po.sku.toLowerCase().includes(q)) return false;

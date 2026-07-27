@@ -153,7 +153,7 @@ interface Props {
   onDateFilterChange?: (next: DateFilterState) => void;
   // Rendered as the first item in the filter toolbar — lets a parent
   // (MarketplaceTabbedView) fold its own Status selector into the same
-  // row as City/Priority/Expiry/Search instead of stacking it above.
+  // row as City/Priority/Search instead of stacking it above.
   leadingToolbarItem?: React.ReactNode;
   // True on marketplace pages, where this table is the last thing on the
   // page and should stretch to fill whatever viewport height is left
@@ -200,34 +200,21 @@ export function PoControlTower({
   // form input.
   const filters = controlledFilters ?? internalFilters;
   const setFilters = onFiltersChange ?? setInternalFilters;
-  const { marketplaceFilter, cityFilter, levelFilter, expiryFilter, search } = filters;
+  const { marketplaceFilter, cityFilter, levelFilter, search } = filters;
   const setMarketplaceFilter = (v: string) => setFilters({ ...filters, marketplaceFilter: v });
   const setCityFilter = (v: string) => setFilters({ ...filters, cityFilter: v });
   const setLevelFilter = (v: string) => setFilters({ ...filters, levelFilter: v });
-  const setExpiryFilter = (v: string) => setFilters({ ...filters, expiryFilter: v });
   const setSearch = (v: string) => setFilters({ ...filters, search: v });
 
   const cities = useMemo(() => Array.from(new Set(rows.map((r) => r.po.city))).sort(), [rows]);
   const levels = ["Critical", "High", "Medium", "Low", "Unscored"];
-  // "No Expiry Date" only shows up when at least one row genuinely lacks
-  // one (e.g. BigBasket/Amazon Now) — no point cluttering the dropdown
-  // with an always-empty bucket for marketplaces that always have a date.
-  const hasAnyMissingExpiry = useMemo(() => rows.some((r) => !r.hasExpiryDate), [rows]);
-  const expiryBuckets = [
-    "Overdue",
-    "Due Today",
-    "≤3 Days",
-    "≤7 Days",
-    "8+ Days",
-    ...(hasAnyMissingExpiry ? ["No Expiry Date"] : []),
-  ];
 
   // Everything except the level/priority filter — the donut chart reads
   // this so all four priority slices stay visible (and clickable) even
   // once one is selected, instead of collapsing to a single 100% slice.
   const filteredExceptLevel = useMemo(
-    () => filterRowsExceptLevel(rows, { marketplaceFilter, cityFilter, expiryFilter, search }),
-    [rows, marketplaceFilter, cityFilter, expiryFilter, search]
+    () => filterRowsExceptLevel(rows, { marketplaceFilter, cityFilter, search }),
+    [rows, marketplaceFilter, cityFilter, search]
   );
 
   const levelCounts = useMemo(() => computeLevelCounts(filteredExceptLevel), [filteredExceptLevel]);
@@ -272,7 +259,6 @@ export function PoControlTower({
         <FilterSelect label="City" value={cityFilter} onChange={setCityFilter} options={cities} />
         <FilterSelect label="Priority" value={levelFilter} onChange={setLevelFilter} options={levels} />
         {dateFilter && onDateFilterChange && <DateFilterBar filter={dateFilter} onChange={onDateFilterChange} />}
-        <FilterSelect label="Expiry" value={expiryFilter} onChange={setExpiryFilter} options={expiryBuckets} />
         <div className="relative">
           <Search size={12} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-neutral-400" />
           <input
