@@ -1,4 +1,4 @@
-import { PurchaseOrder, isPendingStatus, isExpiredStatus } from "@/types/purchase-order";
+import { PurchaseOrder, isPendingStatus } from "@/types/purchase-order";
 import { Rule } from "@/types/rules";
 import { EngineConfig } from "@/lib/config/engine-config";
 import { computeTimeline } from "@/lib/po/derived";
@@ -12,7 +12,6 @@ export interface ExecutiveSummary {
   totalActive: number;
   critical: number;
   high: number;
-  expired: number;
   expiringWithin10Days: number;
   expiredPending: number; // isOverdue: past its own expiry date, still not Delivered
   pendingQty: number;
@@ -102,13 +101,10 @@ export function buildExecutiveSummary(
     }
   }
 
-  const expired = pos.filter((po) => isExpiredStatus(po.status)).length;
-
   return {
     totalActive: pendingPos.length,
     critical,
     high,
-    expired,
     expiringWithin10Days,
     expiredPending,
     pendingQty,

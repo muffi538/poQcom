@@ -39,10 +39,6 @@ function fmtCurrency(n: number): string {
   return `₹${Math.round(n).toLocaleString("en-IN")}`;
 }
 
-function fmtDays(n: number | null): string {
-  return n === null ? "—" : `${n.toFixed(1)}d`;
-}
-
 // Everything below buildExecutiveSummary/buildPoRows/buildTopSkuTable
 // used to run once, server-side, in page.tsx. It's moved here (a Client
 // Component) so the global date filter — shared with every marketplace
@@ -143,20 +139,12 @@ export function OverviewClient({
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-start gap-2">
-        <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+        <div className="grid flex-1 grid-cols-2 gap-2">
           <KpiCard label="Active PO" value={fmtNumber(summary.totalActive)} tone="accent" />
           <KpiCard label="Pending Qty" value={fmtNumber(summary.pendingQty)} />
           <KpiCard label="Pending Value" value={fmtCurrency(summary.pendingValue)} />
           <KpiCard label="Critical" value={fmtNumber(summary.critical)} tone="critical" />
           <KpiCard label="Expired Pending" value={fmtNumber(summary.expiredPending)} tone="critical" />
-          <KpiCard label="Avg Dispatch" value={fmtDays(summary.avgDispatchTimeDays)} />
-          <KpiCard label="Avg Appt Delay" value={fmtDays(summary.avgAppointmentDelayDays)} />
-          <KpiCard
-            label="Avg Days Late"
-            value={summary.avgOperationalDelayDaysLate === null ? "—" : `${summary.avgOperationalDelayDaysLate.toFixed(1)}d`}
-            tone="critical"
-          />
-          <KpiCard label="Expired (Status)" value={fmtNumber(summary.expired)} tone="critical" />
           <KpiCard label="Expiring <10 Days" value={fmtNumber(summary.expiringWithin10Days)} tone="high" />
         </div>
 

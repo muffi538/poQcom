@@ -117,11 +117,17 @@ export function OperationalPoTable({
   note,
   variant,
   pos,
+  fillHeight,
 }: {
   title: string;
   note?: string;
   variant: OperationalVariant;
   pos: PurchaseOrder[];
+  // True on marketplace pages (one tab per status) — the table should
+  // stretch to fill whatever viewport height is left instead of capping
+  // at a fixed max-height and leaving dead space below. False on
+  // Overview's collapsible section, which stays a bounded scroll region.
+  fillHeight?: boolean;
 }) {
   const [selected, setSelected] = useState<PurchaseOrder | null>(null);
   const [cityFilter, setCityFilter] = useState<string>("all");
@@ -149,7 +155,7 @@ export function OperationalPoTable({
   const exportRows: CsvCell[][] = filtered.map((po) => columns.map((c) => c.csv(po)));
 
   return (
-    <div className="space-y-1">
+    <div className={`flex flex-col gap-1 ${fillHeight ? "min-h-0 flex-1" : ""}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h3 className="text-xs font-semibold">
@@ -192,8 +198,8 @@ export function OperationalPoTable({
           />
         </div>
       </div>
-      <div className="glass-card overflow-hidden rounded-md">
-        <div className="max-h-[320px] overflow-auto">
+      <div className={`glass-card flex flex-col overflow-hidden rounded-md ${fillHeight ? "min-h-0 flex-1" : ""}`}>
+        <div className={`overflow-auto ${fillHeight ? "min-h-0 flex-1" : "max-h-[320px]"}`}>
           <table className="w-full table-fixed border-collapse text-left text-[13px]">
             <colgroup>
               {columns.map((c) => (

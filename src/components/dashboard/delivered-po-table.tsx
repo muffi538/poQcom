@@ -125,7 +125,7 @@ function matchesDeliverySpeedBucket(fulfilmentDays: number | null, bucket: Deliv
   return fulfilmentDays > 7; // gt7
 }
 
-export function DeliveredPoTable({ rows }: { rows: DeliveredRow[] }) {
+export function DeliveredPoTable({ rows, fillHeight }: { rows: DeliveredRow[]; fillHeight?: boolean }) {
   const [selected, setSelected] = useState<DeliveredRow | null>(null);
   const [cityFilter, setCityFilter] = useState<string>("all");
   const [marketplaceFilter, setMarketplaceFilter] = useState<string>("all");
@@ -218,7 +218,7 @@ export function DeliveredPoTable({ rows }: { rows: DeliveredRow[] }) {
   ]);
 
   return (
-    <div className="space-y-1">
+    <div className={`flex flex-col gap-1 ${fillHeight ? "min-h-0 flex-1" : ""}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h3 className="text-xs font-semibold">
@@ -313,8 +313,8 @@ export function DeliveredPoTable({ rows }: { rows: DeliveredRow[] }) {
         </div>
       )}
 
-      <div className="glass-card overflow-hidden rounded-md">
-        <div className="max-h-[320px] overflow-auto">
+      <div className={`glass-card flex flex-col overflow-hidden rounded-md ${fillHeight ? "min-h-0 flex-1" : ""}`}>
+        <div className={`overflow-auto ${fillHeight ? "min-h-0 flex-1" : "max-h-[320px]"}`}>
           <table className="w-full table-fixed border-collapse text-left text-[13px]">
             <colgroup>
               {COLUMNS.map((c) => (

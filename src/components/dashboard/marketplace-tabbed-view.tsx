@@ -154,7 +154,7 @@ export function MarketplaceTabbedView({
           bucket starts with its own default filters rather than carrying
           over whatever was set on the previously-viewed tab. */}
       {activeTab === "all" && (
-        <NeedsReviewPoTable key={activeTab} title="All POs" note="Every status, combined — read-only." pos={allPos} />
+        <NeedsReviewPoTable key={activeTab} title="All POs" note="Every status, combined — read-only." pos={allPos} fillHeight />
       )}
       {isPendingOrCritical && (
         <PoControlTower
@@ -176,9 +176,10 @@ export function MarketplaceTabbedView({
           title="Expired POs"
           note="Pending POs that passed their own expiry date — still run through the Priority Engine (Operational Urgency drives their score)."
           rows={expiredRows}
+          fillHeight
         />
       )}
-      {activeTab === "delivered" && <DeliveredPoTable key={activeTab} rows={deliveredRows} />}
+      {activeTab === "delivered" && <DeliveredPoTable key={activeTab} rows={deliveredRows} fillHeight />}
       {activeTab === "dispatched" && (
         <OperationalPoTable
           key={activeTab}
@@ -186,21 +187,35 @@ export function MarketplaceTabbedView({
           note="Already shipped — read-only, kept for dispatch-performance history."
           variant="dispatched"
           pos={dispatchedPos}
+          fillHeight
         />
       )}
       {activeTab === "in_transit" && (
-        <OperationalPoTable key={activeTab} title="In Transit POs" variant="in_transit" pos={inTransitPos} />
+        <OperationalPoTable key={activeTab} title="In Transit POs" variant="in_transit" pos={inTransitPos} fillHeight />
       )}
       {activeTab === "scheduled" && (
-        <OperationalPoTable key={activeTab} title="Scheduled POs" variant="scheduled" pos={scheduledPos} />
+        <OperationalPoTable key={activeTab} title="Scheduled POs" variant="scheduled" pos={scheduledPos} fillHeight />
       )}
       {activeTab === "cancelled" && (
-        <OperationalPoTable key={activeTab} title="Cancelled POs" note="Read-only — kept for record." variant="cancelled" pos={cancelledPos} />
+        <OperationalPoTable
+          key={activeTab}
+          title="Cancelled POs"
+          note="Read-only — kept for record."
+          variant="cancelled"
+          pos={cancelledPos}
+          fillHeight
+        />
       )}
       {activeTab === "low_value" && (
-        <OperationalPoTable key={activeTab} title="Low Value Can't Dispatch" variant="low_value_cant_dispatch" pos={lowValuePos} />
+        <OperationalPoTable
+          key={activeTab}
+          title="Low Value Can't Dispatch"
+          variant="low_value_cant_dispatch"
+          pos={lowValuePos}
+          fillHeight
+        />
       )}
-      {activeTab === "needs_review" && <NeedsReviewPoTable key={activeTab} pos={needsReviewPos} />}
+      {activeTab === "needs_review" && <NeedsReviewPoTable key={activeTab} pos={needsReviewPos} fillHeight />}
       {activeTab === "top_skus" &&
         (topSkuData ? (
           <DemandIntelligence key={activeTab} marketplace={marketplace} data={topSkuData} />
