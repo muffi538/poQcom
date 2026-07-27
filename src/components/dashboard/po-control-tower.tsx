@@ -70,6 +70,7 @@ const COL = {
   fc: 150,
   qty: 60,
   value: 84,
+  poDate: 76,
   expiry: 76,
   delay: 100,
   demand: 34,
@@ -90,6 +91,7 @@ const EXPORT_HEADERS = [
   "FC / Warehouse",
   "Pending Qty",
   "PO Value",
+  "PO Date",
   "Expiry Date",
   "Operational Delay (days)",
   "Metro City",
@@ -284,6 +286,7 @@ export function PoControlTower({
         r.po.warehouse,
         r.po.pendingQty,
         r.po.poValue,
+        r.po.poRaisedDate || null,
         r.po.expiryDate || null,
         r.operationalDelayDays,
         r.isMetroCity ? "Yes" : "No",
@@ -372,6 +375,7 @@ export function PoControlTower({
               <col style={{ width: COL.fc }} />
               <col style={{ width: COL.qty }} />
               <col style={{ width: COL.value }} />
+              <col style={{ width: COL.poDate }} />
               <col style={{ width: COL.expiry }} />
               <col style={{ width: COL.delay }} />
               <col style={{ width: COL.demand }} />
@@ -398,6 +402,7 @@ export function PoControlTower({
                 <th className="px-1.5 py-1.5">FC</th>
                 <th className="px-1.5 py-1.5 text-right">Qty</th>
                 <th className="px-1.5 py-1.5 text-right">Value</th>
+                <th className="px-1.5 py-1.5">PO Date</th>
                 <th className="px-1.5 py-1.5">Expiry</th>
                 <th className="px-1.5 py-1.5">Delay</th>
                 <th className="px-1.5 py-1.5" title="Demand Intelligence: contains a top-selling SKU for this marketplace">
@@ -464,6 +469,7 @@ export function PoControlTower({
                     </td>
                     <td className="px-1.5 text-right tabular-nums">{r.po.pendingQty.toLocaleString("en-IN")}</td>
                     <td className="px-1.5 text-right tabular-nums">{fmtCurrency(r.po.poValue)}</td>
+                    <td className="whitespace-nowrap px-1.5 text-neutral-500">{fmtShortDate(r.po.poRaisedDate)}</td>
                     <td className="whitespace-nowrap px-1.5 text-neutral-500">{fmtShortDate(r.po.expiryDate)}</td>
                     <td className="px-1.5">
                       <OperationalDelayBadge days={r.operationalDelayDays} compact />
