@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Search, SearchX, ArrowUpDown, AlertTriangle } from "lucide-react";
 import { PoRow } from "@/lib/dashboard/po-rows";
 import { PriorityBadge } from "./priority-badge";
+import { StatusBadge } from "./status-badge";
 import { MarketplaceBadge } from "./marketplace-badge";
 import { OperationalDelayBadge } from "./operational-delay";
 import { PoDetailPanel } from "./po-detail-panel";
@@ -71,6 +72,7 @@ const SORT_LABELS: Record<SortKey, string> = {
 // widths that come before them.
 const COL = {
   rank: 30,
+  status: 190,
   priority: 92,
   poNumber: 112,
   marketplace: 84,
@@ -107,12 +109,18 @@ const EXPORT_HEADERS = [
   "Reason / Action",
 ];
 
-const STICKY_LEFT = {
-  rank: 0,
-  priority: COL.rank,
-  poNumber: COL.rank + COL.priority,
-  marketplace: COL.rank + COL.priority + COL.poNumber,
-};
+// Sticky columns' left offsets are cumulative sums of the widths that
+// come before them — the Status column only exists when a caller
+// (MarketplaceTabbedView) supplies leadingToolbarItem, so these shift
+// depending on whether it's present rather than being a fixed constant.
+function stickyLeftOffsets(hasStatusColumn: boolean) {
+  const rank = 0;
+  const status = COL.rank;
+  const priority = status + (hasStatusColumn ? COL.status : 0);
+  const poNumber = priority + COL.priority;
+  const marketplace = poNumber + COL.poNumber;
+  return { rank, status, priority, poNumber, marketplace };
+}
 
 const inputClasses =
   "rounded-lg border border-frido-border bg-white px-2 py-1 text-xs shadow-sm outline-none transition-colors focus:border-[var(--mp-accent)] dark:border-white/10 dark:bg-neutral-900";
@@ -151,9 +159,12 @@ interface Props {
   // table's own `rows`, which already arrive pre-filtered by date.
   dateFilter?: DateFilterState;
   onDateFilterChange?: (next: DateFilterState) => void;
-  // Rendered as the first item in the filter toolbar — lets a parent
-  // (MarketplaceTabbedView) fold its own Status selector into the same
-  // row as City/Priority/Search instead of stacking it above.
+  // Rendered inside the Status column's header cell (first column, before
+  // Priority) instead of the plain "Status" label — lets a parent
+  // (MarketplaceTabbedView) fold its own Status tab-switcher dropdown
+  // directly into the table rather than a separate toolbar control. The
+  // Status column itself only appears when this is provided; Overview
+  // (which has no such control) keeps its original column set.
   leadingToolbarItem?: React.ReactNode;
   // True on marketplace pages, where this table is the last thing on the
   // page and should stretch to fill whatever viewport height is left
@@ -223,6 +234,13 @@ export function PoControlTower({
 
   const sorted = useMemo(() => [...filtered].sort(SORTERS[sortKey]), [filtered, sortKey]);
 
+  // The Status column (and its header dropdown) only shows up where a
+  // parent supplies leadingToolbarItem — marketplace pages, where it
+  // replaces the dropdown's old spot in the toolbar. Overview never
+  // passes this, so its table keeps the original column set.
+  const hasStatusColumn = Boolean(leadingToolbarItem);
+  const STICKY_LEFT = stickyLeftOffsets(hasStatusColumn);
+
   // Exports exactly what's currently filtered/sorted on screen, not the
   // full unfiltered rows — so the download matches what the user is
   // actually looking at. Raw numbers/ISO dates, not display strings
@@ -252,7 +270,6 @@ export function PoControlTower({
   return (
     <div className={`flex flex-col gap-1 ${fillHeight ? "min-h-0 flex-1" : ""}`}>
       <div className="flex flex-wrap items-center gap-1.5">
-        {leadingToolbarItem}
         {marketplaces.length > 1 && (
           <FilterSelect label="Marketplace" value={marketplaceFilter} onChange={setMarketplaceFilter} options={marketplaces} />
         )}
@@ -313,6 +330,7 @@ export function PoControlTower({
           <table className="w-full table-fixed border-collapse text-left">
             <colgroup>
               <col style={{ width: COL.rank }} />
+              {hasStatusColumn && <col style={{ width: COL.status }} />}
               <col style={{ width: COL.priority }} />
               <col style={{ width: COL.poNumber }} />
               <col style={{ width: COL.marketplace }} />
@@ -334,6 +352,14 @@ export function PoControlTower({
                 <th className="po-table-sticky-col sticky z-20 bg-white px-2 py-2 dark:bg-neutral-900" style={{ left: STICKY_LEFT.rank }}>
                   #
                 </th>
+                {hasStatusColumn && (
+                  <th
+                    className="po-table-sticky-col sticky z-20 bg-white px-2 py-1 normal-case tracking-normal dark:bg-neutral-900"
+                    style={{ left: STICKY_LEFT.status }}
+                  >
+                    {leadingToolbarItem}
+                  </th>
+                )}
                 <th className="po-table-sticky-col sticky z-20 bg-white px-2 py-2 dark:bg-neutral-900" style={{ left: STICKY_LEFT.priority }}>
                   Priority
                 </th>
@@ -375,6 +401,14 @@ export function PoControlTower({
                     >
                       {r.rank || "—"}
                     </td>
+                    {hasStatusColumn && (
+                      <td
+                        className="po-table-sticky-col sticky z-10 bg-white px-2 transition-colors group-hover:bg-[#fbf9f2] dark:bg-neutral-900 dark:group-hover:bg-neutral-800"
+                        style={{ left: STICKY_LEFT.status }}
+                      >
+                        <StatusBadge status={r.po.status} compact />
+                      </td>
+                    )}
                     <td
                       className="po-table-sticky-col sticky z-10 bg-white px-2 transition-colors group-hover:bg-[#fbf9f2] dark:bg-neutral-900 dark:group-hover:bg-neutral-800"
                       style={{ left: STICKY_LEFT.priority }}
