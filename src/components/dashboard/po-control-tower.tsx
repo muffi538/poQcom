@@ -262,7 +262,7 @@ export function PoControlTower({
   );
 
   return (
-    <div className={`flex flex-col gap-1.5 ${fillHeight ? "min-h-0 flex-1" : ""}`}>
+    <div className={`flex flex-col gap-1 ${fillHeight ? "min-h-0 flex-1" : ""}`}>
       <div className="flex flex-wrap items-center gap-1.5">
         {leadingToolbarItem}
         {marketplaces.length > 1 && (

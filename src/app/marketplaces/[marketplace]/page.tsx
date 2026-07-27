@@ -63,7 +63,7 @@ export default async function MarketplacePage({
           column fills exactly the viewport height left after the page
           chrome — combined with PoControlTower's fillHeight, the table
           stretches to use it instead of leaving dead space below. */}
-      <div className="flex min-h-[calc(100vh-24px)] flex-col gap-1.5">
+      <div className="flex min-h-[calc(100vh-24px)] flex-col gap-1">
         <h1 className="flex shrink-0 items-center gap-2 text-base font-semibold tracking-tight text-neutral-500">
           <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: theme.primary }} />
           {marketplace}

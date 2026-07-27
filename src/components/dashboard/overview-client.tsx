@@ -116,8 +116,8 @@ export function OverviewClient({
   }, [pos, rules, config, demandIndex, dateFilter]);
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex flex-wrap gap-1">
+    <div className="flex flex-col gap-1">
+      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
         <KpiCard label="Active PO" value={fmtNumber(summary.totalActive)} tone="accent" />
         <KpiCard label="Pending Qty" value={fmtNumber(summary.pendingQty)} />
         <KpiCard label="Pending Value" value={fmtCurrency(summary.pendingValue)} />
