@@ -25,7 +25,8 @@ type TabKey =
   | "scheduled"
   | "cancelled"
   | "low_value"
-  | "needs_review";
+  | "needs_review"
+  | "top_skus";
 
 const TAB_LABELS: Record<TabKey, string> = {
   all: "All",
@@ -39,6 +40,7 @@ const TAB_LABELS: Record<TabKey, string> = {
   cancelled: "Cancelled",
   low_value: "Low Value",
   needs_review: "Needs Review",
+  top_skus: "Top SKUs",
 };
 
 // One tab per status in PO_Operations_Architecture_1.md, plus "All" and
@@ -114,6 +116,7 @@ export function MarketplaceTabbedView({
     { key: "cancelled", label: TAB_LABELS.cancelled, count: cancelledPos.length },
     { key: "low_value", label: TAB_LABELS.low_value, count: lowValuePos.length },
     { key: "needs_review", label: TAB_LABELS.needs_review, count: needsReviewPos.length },
+    { key: "top_skus", label: TAB_LABELS.top_skus, count: topSkuData?.rows.length ?? 0 },
   ];
 
   return (
@@ -169,8 +172,14 @@ export function MarketplaceTabbedView({
         <OperationalPoTable key={activeTab} title="Low Value Can't Dispatch" variant="low_value_cant_dispatch" pos={lowValuePos} />
       )}
       {activeTab === "needs_review" && <NeedsReviewPoTable key={activeTab} pos={needsReviewPos} />}
-
-      {topSkuData && <DemandIntelligence marketplace={marketplace} data={topSkuData} />}
+      {activeTab === "top_skus" &&
+        (topSkuData ? (
+          <DemandIntelligence key={activeTab} marketplace={marketplace} data={topSkuData} />
+        ) : (
+          <div className="glass-card rounded-md p-4 text-xs text-neutral-500">
+            No sales data found for {marketplace} in the Demand Intelligence sheet.
+          </div>
+        ))}
     </div>
   );
 }
