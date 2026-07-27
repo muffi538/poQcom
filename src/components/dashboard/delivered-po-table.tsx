@@ -367,7 +367,7 @@ export function DeliveredPoTable({ rows }: { rows: DeliveredRow[] }) {
                   </td>
                   <td className="whitespace-nowrap px-1.5 text-neutral-500">{fmtDate(r.po.poRaisedDate)}</td>
                   <td className="whitespace-nowrap px-1.5 text-neutral-500">{fmtDate(r.po.dispatchDate)}</td>
-                  <td className="px-1.5 tabular-nums">{r.po.fulfilmentDays === null ? "—" : `${r.po.fulfilmentDays}d`}</td>
+                  <td className="px-1.5 font-semibold tabular-nums">{r.po.fulfilmentDays === null ? "—" : `${r.po.fulfilmentDays}d`}</td>
                   <td className="truncate px-1.5" title={r.po.dispatcherName ?? undefined}>
                     {r.po.dispatcherName ?? "—"}
                   </td>
@@ -382,7 +382,7 @@ export function DeliveredPoTable({ rows }: { rows: DeliveredRow[] }) {
                       <span className="text-neutral-400"> / {r.po.appointmentQty.toLocaleString("en-IN")}</span>
                     )}
                   </td>
-                  <td className="px-1.5 tabular-nums">{r.po.fillRate === null ? "—" : `${r.po.fillRate}%`}</td>
+                  <td className="px-1.5 font-semibold tabular-nums">{r.po.fillRate === null ? "—" : `${r.po.fillRate}%`}</td>
                   <td className="px-1.5 tabular-nums">{fmtCurrency(r.po.poValue)}</td>
                 </tr>
               ))}
