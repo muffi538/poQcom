@@ -220,16 +220,26 @@ export function PoControlTower({
     });
   }, [rows, marketplaceFilter, cityFilter, expiryFilter, search]);
 
+  // Unscored counts as Low in the donut (and everywhere the Low slice is
+  // used) so every Pending PO lands in one of the four visible slices —
+  // confirmed: a Pending PO with no rule signal shouldn't silently vanish
+  // from the donut's total.
   const levelCounts = useMemo(() => {
     const counts = { Critical: 0, High: 0, Medium: 0, Low: 0 };
     for (const r of filteredExceptLevel) {
-      if (r.level in counts) counts[r.level as keyof typeof counts]++;
+      const bucket = r.level === "Unscored" ? "Low" : r.level;
+      if (bucket in counts) counts[bucket as keyof typeof counts]++;
     }
     return counts;
   }, [filteredExceptLevel]);
 
   const filtered = useMemo(
-    () => filteredExceptLevel.filter((r) => levelFilter === "all" || r.level === levelFilter),
+    () =>
+      filteredExceptLevel.filter((r) => {
+        if (levelFilter === "all") return true;
+        if (levelFilter === "Low") return r.level === "Low" || r.level === "Unscored";
+        return r.level === levelFilter;
+      }),
     [filteredExceptLevel, levelFilter]
   );
 
