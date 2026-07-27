@@ -1,6 +1,12 @@
 import { supabase } from "@/lib/supabase";
 import { parseSheetDate } from "@/lib/po/dates";
-import { cityFromZeptoLocation, cityFromBlinkitFcName, cityFromInstamartFcName, cityFromAmazonNowLocation } from "@/lib/po/city";
+import {
+  cityFromZeptoLocation,
+  cityFromBlinkitFcName,
+  cityFromInstamartFcName,
+  cityFromAmazonNowLocation,
+  cityFromBigBasketLocation,
+} from "@/lib/po/city";
 import { detectHeaderRow, toNumber } from "./parsing";
 import { ImportLineItem } from "./types";
 
@@ -72,9 +78,7 @@ const CITY_DERIVATION_FUNCTIONS: Record<string, (warehouse: string) => string> =
   Blinkit: cityFromBlinkitFcName,
   Instamart: cityFromInstamartFcName,
   "Amazon Now": cityFromAmazonNowLocation,
-  // BigBasket has no warehouse/location column at all in its real PO
-  // sheet (confirmed 2026-07-25) -- no entry here, so city stays "" for
-  // it, same as any marketplace with no city source, never fabricated.
+  BigBasket: cityFromBigBasketLocation,
 };
 
 // Converts one sheet row (keyed by sheet column name) into the canonical

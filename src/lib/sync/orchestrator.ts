@@ -5,6 +5,7 @@ import { loadSheetConnection } from "./connections";
 import { importPoWorkbookRows } from "@/lib/import/po-importer";
 import { importSalesWorkbookRows, clearAllSalesRecords } from "@/lib/import/sales-importer";
 import { importDispatchWorkbookRows } from "@/lib/import/dispatch-importer";
+import { reshapeBigBasketPoRows } from "@/lib/import/bigbasket-po-reshape";
 
 // Sync architecture (confirmed): Google Sheets -> Importer -> Supabase ->
 // Priority Engine -> Dashboard. Everything below handles the first three
@@ -102,7 +103,11 @@ export async function syncPoForMarketplace(marketplaceId: string, marketplaceNam
       };
     }
 
-    const rawRows = await readRawRowsFromSheetUrl(connection.sheetUrl, connection.gid);
+    const rawRowsFromSheet = await readRawRowsFromSheetUrl(connection.sheetUrl, connection.gid);
+    // BigBasket's PO tab is a repeating per-PO block, not a flat table —
+    // reshape it into the flat format every other marketplace's sheet
+    // already is, so the shared importer below stays marketplace-agnostic.
+    const rawRows = marketplaceName === "BigBasket" ? reshapeBigBasketPoRows(rawRowsFromSheet) : rawRowsFromSheet;
     const priceMap = await loadSkuCostPriceMap();
 
     const { data: poUpload, error: uploadError } = await supabase

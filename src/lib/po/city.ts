@@ -52,3 +52,14 @@ export function cityFromAmazonNowLocation(location: string): string {
   const city = afterDash.split(",")[0]?.trim() ?? afterDash;
   return toTitleCase(city || location);
 }
+
+// BigBasket "Location" is usually "<City>-<facility code>", e.g.
+// "Chennai-FMCG-DC", "Hyderabad-FV-FMCG DC", "Bangalore-2-FV-FMCG-DC",
+// "Delhi-DC" — except a handful of warehouses that put a "WMS" facility
+// prefix ahead of the city instead, e.g. "WMS-Bangalore-FC2" (confirmed
+// against the real "Bigbasket" tab, 2026-07-27).
+export function cityFromBigBasketLocation(location: string): string {
+  const parts = location.split("-").map((p) => p.trim()).filter(Boolean);
+  const city = parts[0]?.toUpperCase() === "WMS" ? parts[1] : parts[0];
+  return toTitleCase(city || location);
+}
