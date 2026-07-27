@@ -138,34 +138,31 @@ export function OverviewClient({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="flex items-start gap-2">
-        <div className="grid flex-1 grid-cols-2 gap-2">
-          <KpiCard label="Active PO" value={fmtNumber(summary.totalActive)} tone="accent" />
-          <KpiCard label="Pending Qty" value={fmtNumber(summary.pendingQty)} />
-          <KpiCard label="Pending Value" value={fmtCurrency(summary.pendingValue)} />
-          <KpiCard label="Critical" value={fmtNumber(summary.critical)} tone="critical" />
-          <KpiCard label="Expired Pending" value={fmtNumber(summary.expiredPending)} tone="critical" />
-          <KpiCard label="Expiring <10 Days" value={fmtNumber(summary.expiringWithin10Days)} tone="high" />
-        </div>
+      {/* Row 1 + Row 2: 3 KPI cards each, full page width — every card
+          the same size via a fixed 3-column grid, regardless of row. */}
+      <div className="grid grid-cols-3 gap-2">
+        <KpiCard label="Active PO" value={fmtNumber(summary.totalActive)} tone="accent" />
+        <KpiCard label="Pending Qty" value={fmtNumber(summary.pendingQty)} />
+        <KpiCard label="Pending Value" value={fmtCurrency(summary.pendingValue)} />
+        <KpiCard label="Critical" value={fmtNumber(summary.critical)} tone="critical" />
+        <KpiCard label="Expired Pending" value={fmtNumber(summary.expiredPending)} tone="critical" />
+        <KpiCard label="Expiring <10 Days" value={fmtNumber(summary.expiringWithin10Days)} tone="high" />
+      </div>
 
-        {/* Stacked (not stretched full-height) so each donut sizes to its
-            own content — two natural-height cards fill the space beside
-            the KPI grid instead of one card stretched with dead space. */}
-        <div className="flex w-[360px] shrink-0 flex-col gap-2">
-          <PriorityDonutChart
-            counts={levelCounts}
-            activeLevel={poFilters.levelFilter}
-            onSelectLevel={(level) =>
-              setPoFilters((f) => ({ ...f, levelFilter: level === f.levelFilter ? "all" : level }))
-            }
-            variant="large"
-          />
-          <CityDonutChart
-            slices={cityCounts}
-            activeCity={poFilters.cityFilter}
-            onSelectCity={(city) => setPoFilters((f) => ({ ...f, cityFilter: city === f.cityFilter ? "all" : city }))}
-          />
-        </div>
+      {/* Row 3: the two donuts side by side, equal width via grid-cols-2
+          (and equal height via each stretching to fill its grid cell). */}
+      <div className="grid grid-cols-2 items-stretch gap-2">
+        <PriorityDonutChart
+          counts={levelCounts}
+          activeLevel={poFilters.levelFilter}
+          onSelectLevel={(level) => setPoFilters((f) => ({ ...f, levelFilter: level === f.levelFilter ? "all" : level }))}
+          variant="large"
+        />
+        <CityDonutChart
+          slices={cityCounts}
+          activeCity={poFilters.cityFilter}
+          onSelectCity={(city) => setPoFilters((f) => ({ ...f, cityFilter: city === f.cityFilter ? "all" : city }))}
+        />
       </div>
 
       <PoControlTower

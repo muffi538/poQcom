@@ -8,8 +8,8 @@ import { CitySlice } from "@/lib/dashboard/po-control-filters";
 const PALETTE = ["#6366f1", "#0ea5e9", "#10b981", "#f59e0b", "#ec4899", "#8b5cf6"];
 const OTHER_COLOR = "#9ca3af";
 
-const SIZE = 84;
-const STROKE = 13;
+const SIZE = 116;
+const STROKE = 17;
 const RADIUS = (SIZE - STROKE) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
@@ -26,7 +26,7 @@ export function CityDonutChart({
 
   if (total === 0) {
     return (
-      <div className="glass-card flex w-full items-center justify-center rounded-card px-3 py-4 text-xs text-neutral-500">
+      <div className="glass-card flex h-full w-full items-center justify-center rounded-card px-3 py-4 text-xs text-neutral-500">
         No Pending POs match the current filters.
       </div>
     );
@@ -42,7 +42,7 @@ export function CityDonutChart({
   });
 
   return (
-    <div className="glass-card flex w-full items-center gap-3 rounded-card px-4 py-3">
+    <div className="glass-card flex h-full w-full items-center justify-center gap-6 rounded-card px-8 py-6">
       <div className="relative shrink-0" style={{ width: SIZE, height: SIZE }}>
         <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} className="-rotate-90">
           <circle cx={SIZE / 2} cy={SIZE / 2} r={RADIUS} fill="none" strokeWidth={STROKE} className="stroke-neutral-100 dark:stroke-neutral-800" />
@@ -74,7 +74,7 @@ export function CityDonutChart({
         </div>
       </div>
 
-      <div className="grid min-w-0 flex-1 grid-cols-1 gap-y-2">
+      <div className="grid min-w-0 max-w-[280px] flex-1 grid-cols-2 gap-x-4 gap-y-2">
         {segments.map((s) => (
           <button
             key={s.city}
