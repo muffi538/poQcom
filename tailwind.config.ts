@@ -14,7 +14,7 @@ const config: Config = {
           yellow: "#FFC700",
           bg: "#FFFCE0",
           border: "#E4E4E4",
-          sidebar: "#0096C7",
+          sidebar: "#03045E",
         },
       },
       fontFamily: {
