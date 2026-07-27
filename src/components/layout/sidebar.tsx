@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 import { MARKETPLACES, marketplaceSlug } from "@/types/marketplace";
 import { MARKETPLACE_THEMES } from "@/lib/theme/marketplace-colors";
-import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 const staticLinks = [{ href: "/", label: "Overview", icon: LayoutDashboard }];
 const toolLinks = [
@@ -118,7 +117,6 @@ export function Sidebar() {
       </nav>
 
       <div className="m-2 space-y-2">
-        <ThemeToggle collapsed={collapsed} />
         <button
           onClick={() => setCollapsed((c) => !c)}
           className="flex w-full items-center justify-center gap-2 rounded-md border border-white/20 py-1.5 text-xs text-white/80 transition-colors hover:bg-white/10 dark:border-white/10 dark:text-neutral-500 dark:hover:bg-neutral-900"

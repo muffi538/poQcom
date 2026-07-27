@@ -1,9 +1,9 @@
 import { PurchaseOrder } from "@/types/purchase-order";
 
 // Which PO date field the filter narrows on — confirmed default is PO
-// Issue Date (poRaisedDate), with Expiry Date and Dispatch Date as
-// switchable alternatives via the small dropdown beside the date filter.
-export type DateFilterField = "po_date" | "expiry_date" | "dispatch_date";
+// Issue Date (poRaisedDate), with Dispatch Date as a switchable
+// alternative via the small dropdown beside the date filter.
+export type DateFilterField = "po_date" | "dispatch_date";
 
 export type DateFilterPreset =
   | "all_time"
@@ -46,7 +46,6 @@ export const DATE_FILTER_PRESET_LABELS: Record<DateFilterPreset, string> = {
 
 export const DATE_FILTER_FIELD_LABELS: Record<DateFilterField, string> = {
   po_date: "PO Date",
-  expiry_date: "Expiry Date",
   dispatch_date: "Dispatch Date",
 };
 
@@ -130,7 +129,6 @@ export function resolveDateRange(filter: DateFilterState, today: Date = new Date
 
 function dateFieldValue(po: PurchaseOrder, field: DateFilterField): string | null {
   if (field === "po_date") return po.poRaisedDate || null;
-  if (field === "expiry_date") return po.expiryDate || null;
   return po.dispatchDate;
 }
 

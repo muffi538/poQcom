@@ -27,7 +27,7 @@ const PRESET_ORDER: DateFilterPreset[] = [
   "custom",
 ];
 
-const FIELD_ORDER: DateFilterField[] = ["po_date", "expiry_date", "dispatch_date"];
+const FIELD_ORDER: DateFilterField[] = ["po_date", "dispatch_date"];
 
 // Sits in the same toolbar row as City/Priority/Expiry (confirmed
 // placement) — one preset dropdown, a small field-type dropdown beside

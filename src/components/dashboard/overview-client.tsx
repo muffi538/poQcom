@@ -113,17 +113,10 @@ export function OverviewClient({
     <div className="flex flex-col gap-1.5">
       <div className="flex flex-wrap gap-1">
         <KpiCard label="Active PO" value={fmtNumber(summary.totalActive)} tone="accent" />
-        <KpiCard label="Expired Pending" value={fmtNumber(summary.expiredPending)} tone="critical" />
-        <KpiCard label="Critical" value={fmtNumber(summary.critical)} tone="critical" />
-        <KpiCard label="High" value={fmtNumber(summary.high)} tone="high" />
-        <KpiCard label="Medium" value={fmtNumber(summary.medium)} tone="medium" />
-        <KpiCard label="Low" value={fmtNumber(summary.low)} tone="low" />
-        <KpiCard label="Unscored" value={fmtNumber(summary.unscored)} />
-        <KpiCard label="Expired (Status)" value={fmtNumber(summary.expired)} tone="critical" />
-        <KpiCard label="Expiring Today" value={fmtNumber(summary.expiringToday)} tone="high" />
-        <KpiCard label="Expiring Tmrw" value={fmtNumber(summary.expiringTomorrow)} tone="medium" />
         <KpiCard label="Pending Qty" value={fmtNumber(summary.pendingQty)} />
         <KpiCard label="Pending Value" value={fmtCurrency(summary.pendingValue)} />
+        <KpiCard label="Critical" value={fmtNumber(summary.critical)} tone="critical" />
+        <KpiCard label="Expired Pending" value={fmtNumber(summary.expiredPending)} tone="critical" />
         <KpiCard label="Avg Dispatch" value={fmtDays(summary.avgDispatchTimeDays)} />
         <KpiCard label="Avg Appt Delay" value={fmtDays(summary.avgAppointmentDelayDays)} />
         <KpiCard
@@ -131,6 +124,8 @@ export function OverviewClient({
           value={summary.avgOperationalDelayDaysLate === null ? "—" : `${summary.avgOperationalDelayDaysLate.toFixed(1)}d`}
           tone="critical"
         />
+        <KpiCard label="Expired (Status)" value={fmtNumber(summary.expired)} tone="critical" />
+        <KpiCard label="Expiring <10 Days" value={fmtNumber(summary.expiringWithin10Days)} tone="high" />
       </div>
 
       <PoControlTower

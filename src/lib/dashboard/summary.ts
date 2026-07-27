@@ -12,12 +12,8 @@ export interface ExecutiveSummary {
   totalActive: number;
   critical: number;
   high: number;
-  medium: number;
-  low: number;
-  unscored: number;
   expired: number;
-  expiringToday: number;
-  expiringTomorrow: number;
+  expiringWithin10Days: number;
   expiredPending: number; // isOverdue: past its own expiry date, still not Delivered
   pendingQty: number;
   pendingValue: number;
@@ -55,11 +51,7 @@ export function buildExecutiveSummary(
 
   let critical = 0,
     high = 0,
-    medium = 0,
-    low = 0,
-    unscored = 0,
-    expiringToday = 0,
-    expiringTomorrow = 0,
+    expiringWithin10Days = 0,
     expiredPending = 0,
     pendingQty = 0,
     pendingValue = 0;
@@ -75,18 +67,11 @@ export function buildExecutiveSummary(
       case "High":
         high++;
         break;
-      case "Medium":
-        medium++;
-        break;
-      case "Low":
-        low++;
-        break;
       default:
-        unscored++;
+        break;
     }
 
-    if (timeline.hasExpiryDate && timeline.daysRemaining === 0) expiringToday++;
-    if (timeline.hasExpiryDate && timeline.daysRemaining === 1) expiringTomorrow++;
+    if (timeline.hasExpiryDate && timeline.daysRemaining >= 0 && timeline.daysRemaining < 10) expiringWithin10Days++;
     if (timeline.isOverdue) {
       expiredPending++;
       if (timeline.operationalDelayDays !== null) operationalDelaysLate.push(timeline.operationalDelayDays);
@@ -123,12 +108,8 @@ export function buildExecutiveSummary(
     totalActive: pendingPos.length,
     critical,
     high,
-    medium,
-    low,
-    unscored,
     expired,
-    expiringToday,
-    expiringTomorrow,
+    expiringWithin10Days,
     expiredPending,
     pendingQty,
     pendingValue,
