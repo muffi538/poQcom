@@ -64,26 +64,32 @@ export function MarketplacePageClient({
     topSkuData,
   } = useMemo(() => {
     const filteredPos = filterPurchaseOrdersByDate(pos, dateFilter);
-    const today = new Date();
 
     // RTO Done is a pre-filter, same as before this refactor — it's not
     // one of the doc's 9 statuses and nobody's asked to see it.
     const visiblePos = filteredPos.filter((po) => !isFullyExcludedStatus(po.status));
     const byStatus = new Map<string, PurchaseOrder[]>();
     for (const po of visiblePos) {
-      const bucket = classifyOperationalStatus(po, today);
+      const bucket = classifyOperationalStatus(po);
       const group = byStatus.get(bucket) ?? [];
       group.push(po);
       byStatus.set(bucket, group);
     }
     const pendingPos = byStatus.get("pending") ?? [];
-    const expiredPos = byStatus.get("expired") ?? [];
+    // Literal-text "Expired" status only (see isExpiredStatus) — no sheet
+    // currently writes this, so this is essentially always empty.
+    const literalExpiredPos = byStatus.get("expired") ?? [];
     const deliveredPos = byStatus.get("delivered") ?? [];
+    const pendingRows = buildPoRows(pendingPos, rules, config, demandIndex);
 
     return {
       summary: buildExecutiveSummary(visiblePos, rules, config, demandIndex),
-      pendingRows: buildPoRows(pendingPos, rules, config, demandIndex),
-      expiredRows: buildPoRows(expiredPos, rules, config, demandIndex),
+      pendingRows,
+      // A subset of Pending Orders past their own expiry date (isOverdue),
+      // not a separate bucket — keeps this total from ever exceeding
+      // Pending Orders / the priority donut, which both come from the
+      // same pendingRows.
+      expiredRows: [...pendingRows.filter((r) => r.isOverdue), ...buildPoRows(literalExpiredPos, rules, config, demandIndex)],
       deliveredRows: buildDeliveredRows(deliveredPos),
       dispatchedPos: byStatus.get("dispatched") ?? [],
       inTransitPos: byStatus.get("in_transit") ?? [],

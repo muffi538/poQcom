@@ -1,5 +1,3 @@
-import { daysBetween } from "@/lib/po/dates";
-
 // One SKU line on a PO — kept per-line (not just summed into the PO
 // total) because Demand Intelligence needs to know how much of a
 // specific SKU is pending, not just the PO's overall qty.
@@ -154,14 +152,17 @@ export type OperationalStatus =
   | "needs_review";
 
 // Routes a PO to exactly one of the 9 architectural statuses. Checked
-// most-specific-literal-text first; Expired is checked last among the
-// non-Pending cases and derived by date (today past the PO's own expiry
-// date) rather than by any raw status text, since no workbook ever
-// writes "Expired" as a status — it's a computed sub-state of Pending.
-// RTO Done stays a pre-filter callers apply via isFullyExcludedStatus
-// before ever calling this (unchanged from before this refactor — it's
-// not one of the doc's 9 statuses and nobody's asked to see it).
-export function classifyOperationalStatus(po: PurchaseOrder, today: Date = new Date()): OperationalStatus {
+// most-specific-literal-text first. Every Pending-status PO buckets as
+// "pending" regardless of its own expiry date — a PO past its own expiry
+// is still counted as a Pending Order, just flagged isOverdue (see
+// PoTimeline/PoRow) so it stays a subset of Pending everywhere (KPI,
+// donut, table) rather than silently disappearing into a separate
+// bucket. "expired" is reserved for the literal status text "Expired",
+// if a sheet ever writes it directly (none currently do). RTO Done stays
+// a pre-filter callers apply via isFullyExcludedStatus before ever
+// calling this (unchanged from before this refactor — it's not one of
+// the doc's 9 statuses and nobody's asked to see it).
+export function classifyOperationalStatus(po: PurchaseOrder): OperationalStatus {
   if (isCancelledStatus(po.status)) return "cancelled";
   if (isLowValueCantDispatch(po.status)) return "low_value_cant_dispatch";
   if (isDeliveredStatus(po.status)) return "delivered";
@@ -169,12 +170,7 @@ export function classifyOperationalStatus(po: PurchaseOrder, today: Date = new D
   if (isScheduledStatus(po.status)) return "scheduled";
   if (isDispatchedStatus(po.status)) return "dispatched";
   if (isExpiredStatus(po.status)) return "expired";
-  if (isPendingStatus(po.status)) {
-    const todayIso = today.toISOString().slice(0, 10);
-    const daysRemaining = daysBetween(todayIso, po.expiryDate);
-    if (Number.isFinite(daysRemaining) && daysRemaining < 0) return "expired";
-    return "pending";
-  }
+  if (isPendingStatus(po.status)) return "pending";
   return "needs_review";
 }
 
