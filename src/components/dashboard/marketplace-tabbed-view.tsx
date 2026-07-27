@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { PoRow } from "@/lib/dashboard/po-rows";
 import { PurchaseOrder } from "@/types/purchase-order";
 import { DeliveredRow } from "@/lib/workflows/delivered-workflow";
-import { StatusTabBar } from "./status-tab-bar";
+import { StatusDropdown } from "./status-dropdown";
 import { PoControlTower } from "./po-control-tower";
 import { SecondaryPoTable } from "./secondary-po-table";
 import { DeliveredPoTable } from "./delivered-po-table";
@@ -82,7 +83,26 @@ export function MarketplaceTabbedView({
   dateFilter?: DateFilterState;
   onDateFilterChange?: (next: DateFilterState) => void;
 }) {
-  const [activeTab, setActiveTab] = useState<TabKey>("pending");
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const statusFromUrl = searchParams.get("status");
+  const initialTab: TabKey = statusFromUrl && statusFromUrl in TAB_LABELS ? (statusFromUrl as TabKey) : "pending";
+  const [activeTab, setActiveTabState] = useState<TabKey>(initialTab);
+
+  // Keeps the URL shareable/refreshable (?status=delivered) without
+  // polluting browser history — every dropdown change replaces the
+  // current entry rather than pushing a new one.
+  const setActiveTab = useCallback(
+    (key: TabKey) => {
+      setActiveTabState(key);
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("status", key);
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    },
+    [pathname, router, searchParams]
+  );
 
   const criticalCount = useMemo(() => pendingRows.filter((r) => r.level === "Critical").length, [pendingRows]);
 
@@ -121,7 +141,7 @@ export function MarketplaceTabbedView({
 
   return (
     <div className="space-y-1.5">
-      <StatusTabBar tabs={tabs} active={activeTab} onChange={(key) => setActiveTab(key as TabKey)} />
+      <StatusDropdown options={tabs} active={activeTab} onChange={(key) => setActiveTab(key as TabKey)} />
 
       {/* key={activeTab} forces a clean remount per tab — each status
           bucket starts with its own default filters rather than carrying

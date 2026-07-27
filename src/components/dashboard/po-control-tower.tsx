@@ -13,6 +13,7 @@ import { ExportButton } from "./export-button";
 import { CsvCell } from "@/lib/export/csv";
 import { DateFilterBar } from "./date-filter-bar";
 import { DateFilterState } from "@/lib/dashboard/date-filter";
+import { PriorityDonutChart } from "./priority-donut-chart";
 
 type SortKey =
   | "priority"
@@ -76,11 +77,12 @@ const COL = {
   demand: 34,
 };
 // Fixed row height (requirement: every row identical, no growing from
-// wrapped text or multiple reasons; target 38-42px for an enterprise-
-// dense table that shows 20-30 POs per screen) — applied as an explicit
-// height on each <tr>, paired with single-line truncation on every cell
-// so nothing can push a row taller than this.
-const ROW_HEIGHT = "h-10";
+// wrapped text or multiple reasons) — applied as an explicit height on
+// each <tr>, paired with single-line truncation on every cell so nothing
+// can push a row taller than this. 48px (~20% over the previous 40px)
+// per the confirmed "rows feel cramped" request — text size unchanged,
+// just more breathing room.
+const ROW_HEIGHT = "h-12";
 
 const EXPORT_HEADERS = [
   "Rank",
@@ -159,16 +161,6 @@ interface Props {
   onDateFilterChange?: (next: DateFilterState) => void;
 }
 
-type QuickFilter =
-  | "overdue"
-  | "expiringSoon"
-  | "dispatchToday"
-  | "delayedAppt"
-  | "metro"
-  | "highDemand"
-  | "lowValue"
-  | "critical";
-
 export function PoControlTower({
   rows,
   marketplaces,
@@ -184,10 +176,8 @@ export function PoControlTower({
   const [levelFilter, setLevelFilter] = useState<string>(initialLevelFilter ?? "all");
   const [expiryFilter, setExpiryFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
-  const [quickFilters, setQuickFilters] = useState<Set<QuickFilter>>(new Set());
   const [selected, setSelected] = useState<PoRow | null>(null);
 
-  const today = new Date().toISOString().slice(0, 10);
   const cities = useMemo(() => Array.from(new Set(rows.map((r) => r.po.city))).sort(), [rows]);
   const levels = ["Critical", "High", "Medium", "Low", "Unscored"];
   // "No Expiry Date" only shows up when at least one row genuinely lacks
@@ -203,70 +193,34 @@ export function PoControlTower({
     ...(hasAnyMissingExpiry ? ["No Expiry Date"] : []),
   ];
 
-  // Counts shown on each chip reflect the whole Pending queue, independent
-  // of whatever else is currently filtered — so the number always answers
-  // "how big is this cohort," not "how many are left after my other filters."
-  const quickFilterDefs: Array<{ key: QuickFilter; label: string; count: number; test: (r: PoRow) => boolean }> = [
-    { key: "critical", label: "Critical", count: rows.filter((r) => r.level === "Critical").length, test: (r) => r.level === "Critical" },
-    { key: "overdue", label: "Overdue", count: rows.filter((r) => r.isOverdue).length, test: (r) => r.isOverdue },
-    {
-      key: "expiringSoon",
-      label: "Expiring ≤3d",
-      count: rows.filter((r) => r.hasExpiryDate && !r.isOverdue && r.daysRemaining <= 3).length,
-      test: (r) => r.hasExpiryDate && !r.isOverdue && r.daysRemaining <= 3,
-    },
-    {
-      key: "dispatchToday",
-      label: "Dispatch Today",
-      count: rows.filter((r) => r.po.appointmentDate === today).length,
-      test: (r) => r.po.appointmentDate === today,
-    },
-    {
-      key: "delayedAppt",
-      label: "Delayed Appt",
-      count: rows.filter((r) => (r.appointmentDelayDays ?? 0) > 0).length,
-      test: (r) => (r.appointmentDelayDays ?? 0) > 0,
-    },
-    { key: "metro", label: "Metro", count: rows.filter((r) => r.isMetroCity).length, test: (r) => r.isMetroCity },
-    {
-      key: "highDemand",
-      label: "High Demand",
-      count: rows.filter((r) => r.demandHits.some((h) => h.rank <= HIGH_DEMAND_RANK_THRESHOLD)).length,
-      test: (r) => r.demandHits.some((h) => h.rank <= HIGH_DEMAND_RANK_THRESHOLD),
-    },
-    {
-      key: "lowValue",
-      label: "Low Value",
-      count: rows.filter((r) => r.po.poValue !== null && r.po.poValue < 25000).length,
-      test: (r) => r.po.poValue !== null && r.po.poValue < 25000,
-    },
-  ];
-
-  function toggleQuickFilter(key: QuickFilter) {
-    setQuickFilters((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
-
-  const filtered = useMemo(() => {
-    const activeTests = quickFilterDefs.filter((d) => quickFilters.has(d.key)).map((d) => d.test);
+  // Everything except the level/priority filter — the donut chart reads
+  // this so all four priority slices stay visible (and clickable) even
+  // once one is selected, instead of collapsing to a single 100% slice.
+  const filteredExceptLevel = useMemo(() => {
     return rows.filter((r) => {
       if (marketplaceFilter !== "all" && r.po.marketplace !== marketplaceFilter) return false;
       if (cityFilter !== "all" && r.po.city !== cityFilter) return false;
-      if (levelFilter !== "all" && r.level !== levelFilter) return false;
       if (expiryFilter !== "all" && !matchesExpiryBucket(r, expiryFilter)) return false;
-      if (!activeTests.every((test) => test(r))) return false;
       if (search.trim()) {
         const q = search.trim().toLowerCase();
         if (!r.po.id.toLowerCase().includes(q) && !r.po.sku.toLowerCase().includes(q)) return false;
       }
       return true;
-      // eslint-disable-next-line react-hooks/exhaustive-deps
     });
-  }, [rows, marketplaceFilter, cityFilter, levelFilter, expiryFilter, quickFilters, search]);
+  }, [rows, marketplaceFilter, cityFilter, expiryFilter, search]);
+
+  const levelCounts = useMemo(() => {
+    const counts = { Critical: 0, High: 0, Medium: 0, Low: 0 };
+    for (const r of filteredExceptLevel) {
+      if (r.level in counts) counts[r.level as keyof typeof counts]++;
+    }
+    return counts;
+  }, [filteredExceptLevel]);
+
+  const filtered = useMemo(
+    () => filteredExceptLevel.filter((r) => levelFilter === "all" || r.level === levelFilter),
+    [filteredExceptLevel, levelFilter]
+  );
 
   const sorted = useMemo(() => [...filtered].sort(SORTERS[sortKey]), [filtered, sortKey]);
 
@@ -316,22 +270,6 @@ export function PoControlTower({
           />
         </div>
 
-        <span className="mx-1 h-4 w-px bg-frido-border dark:bg-white/10" />
-
-        {quickFilterDefs.map((d) => (
-          <button
-            key={d.key}
-            onClick={() => toggleQuickFilter(d.key)}
-            className={`rounded border px-2 py-1 text-[11px] font-medium transition-colors ${
-              quickFilters.has(d.key)
-                ? "border-[var(--mp-accent)] bg-[var(--mp-primary)]/20 text-[var(--mp-accent)]"
-                : "border-frido-border text-neutral-500 hover:bg-neutral-50 dark:border-white/10 dark:hover:bg-neutral-900"
-            }`}
-          >
-            {d.label} <span className="tabular-nums opacity-70">{d.count}</span>
-          </button>
-        ))}
-
         <div className="relative ml-auto">
           <ArrowUpDown size={12} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-neutral-400" />
           <select value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)} className={`${inputClasses} pl-6`}>
@@ -362,6 +300,12 @@ export function PoControlTower({
           demand data. ({demandError})
         </div>
       )}
+
+      <PriorityDonutChart
+        counts={levelCounts}
+        activeLevel={levelFilter}
+        onSelectLevel={(level) => setLevelFilter(level === levelFilter ? "all" : level)}
+      />
 
       <div className="glass-card overflow-hidden rounded-md">
         <div className="h-[80vh] overflow-auto">

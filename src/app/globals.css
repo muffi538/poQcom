@@ -12,6 +12,14 @@
   body {
     font-feature-settings: "cv11", "ss01";
   }
+
+  /* Some browsers render a native <select>'s open dropdown popup with
+     the OS/system font regardless of page CSS — this forces it back to
+     the app's own font stack wherever a native select is still used. */
+  select,
+  option {
+    font-family: inherit;
+  }
 }
 
 @layer utilities {
