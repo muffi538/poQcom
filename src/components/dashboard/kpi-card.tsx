@@ -24,14 +24,14 @@ export function KpiCard({
   const accent = TONE_ACCENT[tone] ?? TONE_ACCENT.default;
   return (
     <div
-      className="glass-card flex h-full flex-col justify-center rounded-md px-3 py-2.5"
-      style={accent !== "transparent" ? { borderLeft: `4px solid ${accent}` } : undefined}
+      className="glass-card flex h-full flex-col justify-center rounded-lg px-4 py-4"
+      style={accent !== "transparent" ? { borderLeft: `5px solid ${accent}` } : undefined}
     >
-      <div className="truncate text-[10px] font-semibold uppercase tracking-wide text-neutral-500" title={label}>
+      <div className="truncate text-[11px] font-semibold uppercase tracking-wide text-neutral-500" title={label}>
         {label}
       </div>
       <div
-        className="mt-0.5 truncate text-[26px] font-extrabold leading-none tabular-nums text-neutral-900 dark:text-neutral-50"
+        className="mt-1 truncate text-[34px] font-extrabold leading-none tabular-nums text-neutral-900 dark:text-neutral-50"
         title={String(value)}
       >
         {value}

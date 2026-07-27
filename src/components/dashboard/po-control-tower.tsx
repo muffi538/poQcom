@@ -14,6 +14,13 @@ import { CsvCell } from "@/lib/export/csv";
 import { DateFilterBar } from "./date-filter-bar";
 import { DateFilterState } from "@/lib/dashboard/date-filter";
 import { PriorityDonutChart } from "./priority-donut-chart";
+import {
+  DEFAULT_PO_CONTROL_FILTERS,
+  PoControlFilters,
+  computeLevelCounts,
+  filterRowsByLevel,
+  filterRowsExceptLevel,
+} from "@/lib/dashboard/po-control-filters";
 
 type SortKey =
   | "priority"
@@ -110,20 +117,6 @@ const STICKY_LEFT = {
 const inputClasses =
   "rounded-lg border border-frido-border bg-white px-2 py-1 text-xs shadow-sm outline-none transition-colors focus:border-[var(--mp-accent)] dark:border-white/10 dark:bg-neutral-900";
 
-// Single-select Expiry bucket for the toolbar dropdown — distinct from
-// the OR-able "Overdue"/"Expiring ≤3d" quick-filter chips (those layer on
-// top of everything else; this picks exactly one bucket at a time, per
-// the confirmed toolbar filter set: City / Marketplace / Priority /
-// Expiry / Search).
-function matchesExpiryBucket(r: PoRow, bucket: string): boolean {
-  if (!r.hasExpiryDate) return bucket === "No Expiry Date";
-  if (r.isOverdue) return bucket === "Overdue";
-  if (r.daysRemaining === 0) return bucket === "Due Today";
-  if (r.daysRemaining <= 3) return bucket === "≤3 Days";
-  if (r.daysRemaining <= 7) return bucket === "≤7 Days";
-  return bucket === "8+ Days";
-}
-
 function fmtShortDate(iso: string | null): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
@@ -168,6 +161,16 @@ interface Props {
   // which has more sections after this table and needs its own bounded
   // scroll region instead.
   fillHeight?: boolean;
+  // Overview lifts the toolbar filter state out so it can render its own
+  // (larger) donut beside the KPI grid, above this component entirely,
+  // while this table stays driven by the exact same state. Omitted by
+  // marketplace pages, which keep the donut inline here (uncontrolled,
+  // fully local state) exactly as before.
+  filters?: PoControlFilters;
+  onFiltersChange?: (next: PoControlFilters) => void;
+  // Set by Overview once it's rendering its own copy of the donut above
+  // this component — skips the inline one here so it doesn't show twice.
+  hideDonut?: boolean;
 }
 
 export function PoControlTower({
@@ -180,14 +183,29 @@ export function PoControlTower({
   onDateFilterChange,
   leadingToolbarItem,
   fillHeight,
+  filters: controlledFilters,
+  onFiltersChange,
+  hideDonut,
 }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>("priority");
-  const [marketplaceFilter, setMarketplaceFilter] = useState<string>("all");
-  const [cityFilter, setCityFilter] = useState<string>("all");
-  const [levelFilter, setLevelFilter] = useState<string>(initialLevelFilter ?? "all");
-  const [expiryFilter, setExpiryFilter] = useState<string>("all");
-  const [search, setSearch] = useState("");
+  const [internalFilters, setInternalFilters] = useState<PoControlFilters>({
+    ...DEFAULT_PO_CONTROL_FILTERS,
+    levelFilter: initialLevelFilter ?? "all",
+  });
   const [selected, setSelected] = useState<PoRow | null>(null);
+
+  // Controlled when Overview passes filters/onFiltersChange (so it can
+  // read the same state to drive its own donut); uncontrolled/local
+  // otherwise (marketplace pages) — same pattern as any controllable
+  // form input.
+  const filters = controlledFilters ?? internalFilters;
+  const setFilters = onFiltersChange ?? setInternalFilters;
+  const { marketplaceFilter, cityFilter, levelFilter, expiryFilter, search } = filters;
+  const setMarketplaceFilter = (v: string) => setFilters({ ...filters, marketplaceFilter: v });
+  const setCityFilter = (v: string) => setFilters({ ...filters, cityFilter: v });
+  const setLevelFilter = (v: string) => setFilters({ ...filters, levelFilter: v });
+  const setExpiryFilter = (v: string) => setFilters({ ...filters, expiryFilter: v });
+  const setSearch = (v: string) => setFilters({ ...filters, search: v });
 
   const cities = useMemo(() => Array.from(new Set(rows.map((r) => r.po.city))).sort(), [rows]);
   const levels = ["Critical", "High", "Medium", "Low", "Unscored"];
@@ -207,41 +225,14 @@ export function PoControlTower({
   // Everything except the level/priority filter — the donut chart reads
   // this so all four priority slices stay visible (and clickable) even
   // once one is selected, instead of collapsing to a single 100% slice.
-  const filteredExceptLevel = useMemo(() => {
-    return rows.filter((r) => {
-      if (marketplaceFilter !== "all" && r.po.marketplace !== marketplaceFilter) return false;
-      if (cityFilter !== "all" && r.po.city !== cityFilter) return false;
-      if (expiryFilter !== "all" && !matchesExpiryBucket(r, expiryFilter)) return false;
-      if (search.trim()) {
-        const q = search.trim().toLowerCase();
-        if (!r.po.id.toLowerCase().includes(q) && !r.po.sku.toLowerCase().includes(q)) return false;
-      }
-      return true;
-    });
-  }, [rows, marketplaceFilter, cityFilter, expiryFilter, search]);
-
-  // Unscored counts as Low in the donut (and everywhere the Low slice is
-  // used) so every Pending PO lands in one of the four visible slices —
-  // confirmed: a Pending PO with no rule signal shouldn't silently vanish
-  // from the donut's total.
-  const levelCounts = useMemo(() => {
-    const counts = { Critical: 0, High: 0, Medium: 0, Low: 0 };
-    for (const r of filteredExceptLevel) {
-      const bucket = r.level === "Unscored" ? "Low" : r.level;
-      if (bucket in counts) counts[bucket as keyof typeof counts]++;
-    }
-    return counts;
-  }, [filteredExceptLevel]);
-
-  const filtered = useMemo(
-    () =>
-      filteredExceptLevel.filter((r) => {
-        if (levelFilter === "all") return true;
-        if (levelFilter === "Low") return r.level === "Low" || r.level === "Unscored";
-        return r.level === levelFilter;
-      }),
-    [filteredExceptLevel, levelFilter]
+  const filteredExceptLevel = useMemo(
+    () => filterRowsExceptLevel(rows, { marketplaceFilter, cityFilter, expiryFilter, search }),
+    [rows, marketplaceFilter, cityFilter, expiryFilter, search]
   );
+
+  const levelCounts = useMemo(() => computeLevelCounts(filteredExceptLevel), [filteredExceptLevel]);
+
+  const filtered = useMemo(() => filterRowsByLevel(filteredExceptLevel, levelFilter), [filteredExceptLevel, levelFilter]);
 
   const sorted = useMemo(() => [...filtered].sort(SORTERS[sortKey]), [filtered, sortKey]);
 
@@ -323,11 +314,13 @@ export function PoControlTower({
         </div>
       )}
 
-      <PriorityDonutChart
-        counts={levelCounts}
-        activeLevel={levelFilter}
-        onSelectLevel={(level) => setLevelFilter(level === levelFilter ? "all" : level)}
-      />
+      {!hideDonut && (
+        <PriorityDonutChart
+          counts={levelCounts}
+          activeLevel={levelFilter}
+          onSelectLevel={(level) => setLevelFilter(level === levelFilter ? "all" : level)}
+        />
+      )}
 
       <div className={`glass-card flex flex-col overflow-hidden rounded-md ${fillHeight ? "min-h-0 flex-1" : ""}`}>
         <div className={`overflow-auto ${fillHeight ? "min-h-0 flex-1" : "h-[80vh]"}`}>

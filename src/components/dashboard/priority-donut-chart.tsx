@@ -14,29 +14,60 @@ const LEVEL_COLOR: Record<Level, string> = {
   Low: "#0ca30c",
 };
 
-// Compact by design (confirmed: the donut shouldn't eat vertical space
-// that could show more table rows) — a 2x2 stat grid sits beside it
-// rather than a tall stacked legend, and the card is sized to its
-// content (not a full-width bar) so it doesn't leave dead whitespace.
-const SIZE = 48;
-const STROKE = 8;
-const RADIUS = (SIZE - STROKE) / 2;
-const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+// "compact" sits inline in a toolbar/table header (confirmed: shouldn't
+// eat vertical space that could show more table rows) — used on
+// marketplace pages. "large" sits beside the KPI grid on Overview, where
+// it has a full 2-row-tall KPI block's worth of height to fill, so it
+// needs to look like a real executive-dashboard chart, not an
+// afterthought squeezed beside big numbers.
+const VARIANTS = {
+  compact: {
+    size: 48,
+    stroke: 8,
+    wrapper: "w-fit gap-2 px-2.5 py-1",
+    legendCols: "grid-cols-2",
+    gridGap: "gap-x-2 gap-y-0",
+    legendItem: "gap-1 px-1 py-0 text-[10px]",
+    legendDot: "h-1.5 w-1.5",
+    centerTotal: "text-[11px]",
+    centerLabel: "mt-0.5 text-[6px]",
+  },
+  // Legend stacks in a single column here (vs. compact's 2x2 grid) —
+  // beside a full 2-row-tall KPI block there's plenty of height but not
+  // much spare width, and 4 rows of "dot / level / count / pct" each get
+  // to breathe instead of being squeezed two-per-line.
+  large: {
+    size: 104,
+    stroke: 16,
+    wrapper: "h-full w-full gap-5 px-6 py-4",
+    legendCols: "grid-cols-1",
+    gridGap: "gap-y-2",
+    legendItem: "w-full gap-2 whitespace-nowrap px-1.5 py-1 text-sm",
+    legendDot: "h-2.5 w-2.5",
+    centerTotal: "text-2xl",
+    centerLabel: "mt-1 text-[11px]",
+  },
+} as const;
 
 export function PriorityDonutChart({
   counts,
   activeLevel,
   onSelectLevel,
+  variant = "compact",
 }: {
   counts: Record<Level, number>;
   activeLevel: string;
   onSelectLevel: (level: Level) => void;
+  variant?: "compact" | "large";
 }) {
+  const v = VARIANTS[variant];
+  const radius = (v.size - v.stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
   const total = LEVELS.reduce((sum, l) => sum + counts[l], 0);
 
   if (total === 0) {
     return (
-      <div className="glass-card flex w-fit items-center justify-center rounded-card px-3 py-1 text-xs text-neutral-500">
+      <div className={`glass-card flex items-center justify-center rounded-card px-3 py-1 text-xs text-neutral-500 ${variant === "large" ? "h-full w-full" : "w-fit"}`}>
         No Pending POs match the current filters.
       </div>
     );
@@ -46,28 +77,28 @@ export function PriorityDonutChart({
   const segments = LEVELS.map((level) => {
     const value = counts[level];
     const fraction = value / total;
-    const dash = fraction * CIRCUMFERENCE;
+    const dash = fraction * circumference;
     const offset = cumulative;
     cumulative += dash;
     return { level, value, fraction, dash, offset };
   });
 
   return (
-    <div className="glass-card flex w-fit items-center gap-2 rounded-card px-2.5 py-1">
-      <div className="relative shrink-0" style={{ width: SIZE, height: SIZE }}>
-        <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} className="-rotate-90">
-          <circle cx={SIZE / 2} cy={SIZE / 2} r={RADIUS} fill="none" strokeWidth={STROKE} className="stroke-neutral-100 dark:stroke-neutral-800" />
+    <div className={`glass-card flex items-center rounded-card ${v.wrapper}`}>
+      <div className="relative shrink-0" style={{ width: v.size, height: v.size }}>
+        <svg width={v.size} height={v.size} viewBox={`0 0 ${v.size} ${v.size}`} className="-rotate-90">
+          <circle cx={v.size / 2} cy={v.size / 2} r={radius} fill="none" strokeWidth={v.stroke} className="stroke-neutral-100 dark:stroke-neutral-800" />
           {segments.map((s) =>
             s.value === 0 ? null : (
               <circle
                 key={s.level}
-                cx={SIZE / 2}
-                cy={SIZE / 2}
-                r={RADIUS}
+                cx={v.size / 2}
+                cy={v.size / 2}
+                r={radius}
                 fill="none"
                 stroke={LEVEL_COLOR[s.level]}
-                strokeWidth={STROKE}
-                strokeDasharray={`${s.dash} ${CIRCUMFERENCE - s.dash}`}
+                strokeWidth={v.stroke}
+                strokeDasharray={`${s.dash} ${circumference - s.dash}`}
                 strokeDashoffset={-s.offset}
                 strokeLinecap="butt"
                 className="cursor-pointer transition-opacity"
@@ -80,21 +111,21 @@ export function PriorityDonutChart({
           )}
         </svg>
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-[11px] font-bold leading-none">{total}</span>
-          <span className="mt-0.5 text-[6px] leading-none text-neutral-500">Pending</span>
+          <span className={`font-bold leading-none ${v.centerTotal}`}>{total}</span>
+          <span className={`leading-none text-neutral-500 ${v.centerLabel}`}>Pending</span>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-x-2 gap-y-0">
+      <div className={`grid ${v.legendCols} ${v.gridGap}`}>
         {segments.map((s) => (
           <button
             key={s.level}
             onClick={() => onSelectLevel(s.level)}
-            className={`flex items-center gap-1 rounded px-1 py-0 text-left text-[10px] leading-tight transition-colors ${
+            className={`flex items-center rounded text-left leading-tight transition-colors ${v.legendItem} ${
               activeLevel === s.level ? "bg-neutral-100 dark:bg-neutral-800" : "hover:bg-neutral-50 dark:hover:bg-neutral-900"
             }`}
           >
-            <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: LEVEL_COLOR[s.level] }} />
+            <span className={`shrink-0 rounded-full ${v.legendDot}`} style={{ backgroundColor: LEVEL_COLOR[s.level] }} />
             <span className="font-medium">{s.level}</span>
             <span className="tabular-nums text-neutral-500">{s.value}</span>
             <span className="tabular-nums text-neutral-400">({Math.round(s.fraction * 100)}%)</span>

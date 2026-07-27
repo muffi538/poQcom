@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { PoControlTower } from "@/components/dashboard/po-control-tower";
+import { PriorityDonutChart } from "@/components/dashboard/priority-donut-chart";
 import { PoCharts } from "@/components/dashboard/po-charts";
 import { SecondaryPoTable } from "@/components/dashboard/secondary-po-table";
 import { DeliveredPoTable } from "@/components/dashboard/delivered-po-table";
@@ -21,6 +22,7 @@ import { EngineConfig } from "@/lib/config/engine-config";
 import { DemandIndex } from "@/lib/demand/rank";
 import { useDateFilter } from "@/lib/dashboard/use-date-filter";
 import { filterPurchaseOrdersByDate } from "@/lib/dashboard/date-filter";
+import { DEFAULT_PO_CONTROL_FILTERS, computeLevelCounts, filterRowsExceptLevel } from "@/lib/dashboard/po-control-filters";
 
 function fmtNumber(n: number): string {
   return n.toLocaleString("en-IN");
@@ -62,6 +64,13 @@ export function OverviewClient({
 }) {
   const [dateFilter, setDateFilter] = useDateFilter();
   const hasRules = rules.some((r) => r.enabled);
+  // Lifted out of PoControlTower (rather than local to it) so the donut
+  // beside the KPI grid reads the exact same Marketplace/City/Expiry/
+  // Search/Priority state driving the table below — clicking a slice
+  // filters the table, and the table's own filters narrow the donut,
+  // with a single shared source of truth instead of two copies drifting
+  // apart.
+  const [poFilters, setPoFilters] = useState(DEFAULT_PO_CONTROL_FILTERS);
 
   const {
     summary,
@@ -115,23 +124,41 @@ export function OverviewClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pos, rules, config, demandIndex, dateFilter]);
 
+  const levelCounts = useMemo(
+    () => computeLevelCounts(filterRowsExceptLevel(pendingRows, poFilters)),
+    [pendingRows, poFilters]
+  );
+
   return (
-    <div className="flex flex-col gap-1">
-      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
-        <KpiCard label="Active PO" value={fmtNumber(summary.totalActive)} tone="accent" />
-        <KpiCard label="Pending Qty" value={fmtNumber(summary.pendingQty)} />
-        <KpiCard label="Pending Value" value={fmtCurrency(summary.pendingValue)} />
-        <KpiCard label="Critical" value={fmtNumber(summary.critical)} tone="critical" />
-        <KpiCard label="Expired Pending" value={fmtNumber(summary.expiredPending)} tone="critical" />
-        <KpiCard label="Avg Dispatch" value={fmtDays(summary.avgDispatchTimeDays)} />
-        <KpiCard label="Avg Appt Delay" value={fmtDays(summary.avgAppointmentDelayDays)} />
-        <KpiCard
-          label="Avg Days Late"
-          value={summary.avgOperationalDelayDaysLate === null ? "—" : `${summary.avgOperationalDelayDaysLate.toFixed(1)}d`}
-          tone="critical"
-        />
-        <KpiCard label="Expired (Status)" value={fmtNumber(summary.expired)} tone="critical" />
-        <KpiCard label="Expiring <10 Days" value={fmtNumber(summary.expiringWithin10Days)} tone="high" />
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-stretch gap-2">
+        <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+          <KpiCard label="Active PO" value={fmtNumber(summary.totalActive)} tone="accent" />
+          <KpiCard label="Pending Qty" value={fmtNumber(summary.pendingQty)} />
+          <KpiCard label="Pending Value" value={fmtCurrency(summary.pendingValue)} />
+          <KpiCard label="Critical" value={fmtNumber(summary.critical)} tone="critical" />
+          <KpiCard label="Expired Pending" value={fmtNumber(summary.expiredPending)} tone="critical" />
+          <KpiCard label="Avg Dispatch" value={fmtDays(summary.avgDispatchTimeDays)} />
+          <KpiCard label="Avg Appt Delay" value={fmtDays(summary.avgAppointmentDelayDays)} />
+          <KpiCard
+            label="Avg Days Late"
+            value={summary.avgOperationalDelayDaysLate === null ? "—" : `${summary.avgOperationalDelayDaysLate.toFixed(1)}d`}
+            tone="critical"
+          />
+          <KpiCard label="Expired (Status)" value={fmtNumber(summary.expired)} tone="critical" />
+          <KpiCard label="Expiring <10 Days" value={fmtNumber(summary.expiringWithin10Days)} tone="high" />
+        </div>
+
+        <div className="w-[280px] shrink-0">
+          <PriorityDonutChart
+            counts={levelCounts}
+            activeLevel={poFilters.levelFilter}
+            onSelectLevel={(level) =>
+              setPoFilters((f) => ({ ...f, levelFilter: level === f.levelFilter ? "all" : level }))
+            }
+            variant="large"
+          />
+        </div>
       </div>
 
       <PoControlTower
@@ -141,6 +168,9 @@ export function OverviewClient({
         demandError={demandError}
         dateFilter={dateFilter}
         onDateFilterChange={setDateFilter}
+        filters={poFilters}
+        onFiltersChange={setPoFilters}
+        hideDonut
       />
       <DemandIntelligenceTabs marketplaces={[...MARKETPLACES]} data={topSkuByMarketplace} />
       <details className="glass-card rounded-lg px-3 py-1.5 text-xs">
