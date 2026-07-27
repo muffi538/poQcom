@@ -110,7 +110,7 @@ export function OverviewClient({
   }, [pos, rules, config, demandIndex, dateFilter]);
 
   return (
-    <>
+    <div className="flex flex-col gap-1.5">
       <div className="flex flex-wrap gap-1">
         <KpiCard label="Active PO" value={fmtNumber(summary.totalActive)} tone="accent" />
         <KpiCard label="Expired Pending" value={fmtNumber(summary.expiredPending)} tone="critical" />
@@ -167,6 +167,6 @@ export function OverviewClient({
           <PoCharts rows={pendingRows} />
         </div>
       </details>
-    </>
+    </div>
   );
 }

@@ -98,7 +98,7 @@ export function MarketplacePageClient({
 
   return (
     <>
-      <div className="flex flex-wrap gap-1">
+      <div className="flex shrink-0 flex-wrap gap-1">
         <KpiCard label="Pending Orders" value={summary.totalActive} tone="accent" />
         <KpiCard label="Expired Pending" value={summary.expiredPending} tone="critical" />
         <KpiCard label="Pending Qty" value={summary.pendingQty} tone="accent" />

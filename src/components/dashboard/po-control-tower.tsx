@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search, SearchX, ArrowUpDown, AlertTriangle, Flame } from "lucide-react";
+import { Search, SearchX, ArrowUpDown, AlertTriangle } from "lucide-react";
 import { PoRow } from "@/lib/dashboard/po-rows";
 import { PriorityBadge } from "./priority-badge";
 import { MarketplaceBadge } from "./marketplace-badge";
@@ -74,15 +74,14 @@ const COL = {
   poDate: 76,
   expiry: 76,
   delay: 100,
-  demand: 34,
 };
 // Fixed row height (requirement: every row identical, no growing from
 // wrapped text or multiple reasons) — applied as an explicit height on
 // each <tr>, paired with single-line truncation on every cell so nothing
-// can push a row taller than this. 48px (~20% over the previous 40px)
-// per the confirmed "rows feel cramped" request — text size unchanged,
-// just more breathing room.
-const ROW_HEIGHT = "h-12";
+// can push a row taller than this. 56px (~17% over the prior 48px) per
+// the confirmed "rows still feel cramped" follow-up, alongside a slightly
+// larger table font (13px -> 14px) and more cell padding.
+const ROW_HEIGHT = "h-14";
 
 const EXPORT_HEADERS = [
   "Rank",
@@ -159,6 +158,16 @@ interface Props {
   // table's own `rows`, which already arrive pre-filtered by date.
   dateFilter?: DateFilterState;
   onDateFilterChange?: (next: DateFilterState) => void;
+  // Rendered as the first item in the filter toolbar — lets a parent
+  // (MarketplaceTabbedView) fold its own Status selector into the same
+  // row as City/Priority/Expiry/Search instead of stacking it above.
+  leadingToolbarItem?: React.ReactNode;
+  // True on marketplace pages, where this table is the last thing on the
+  // page and should stretch to fill whatever viewport height is left
+  // (no page-level scroll, no dead space below it). False on Overview,
+  // which has more sections after this table and needs its own bounded
+  // scroll region instead.
+  fillHeight?: boolean;
 }
 
 export function PoControlTower({
@@ -169,6 +178,8 @@ export function PoControlTower({
   initialLevelFilter,
   dateFilter,
   onDateFilterChange,
+  leadingToolbarItem,
+  fillHeight,
 }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>("priority");
   const [marketplaceFilter, setMarketplaceFilter] = useState<string>("all");
@@ -251,8 +262,9 @@ export function PoControlTower({
   );
 
   return (
-    <div className="space-y-1.5">
+    <div className={`flex flex-col gap-1.5 ${fillHeight ? "min-h-0 flex-1" : ""}`}>
       <div className="flex flex-wrap items-center gap-1.5">
+        {leadingToolbarItem}
         {marketplaces.length > 1 && (
           <FilterSelect label="Marketplace" value={marketplaceFilter} onChange={setMarketplaceFilter} options={marketplaces} />
         )}
@@ -307,8 +319,8 @@ export function PoControlTower({
         onSelectLevel={(level) => setLevelFilter(level === levelFilter ? "all" : level)}
       />
 
-      <div className="glass-card overflow-hidden rounded-md">
-        <div className="h-[80vh] overflow-auto">
+      <div className={`glass-card flex flex-col overflow-hidden rounded-md ${fillHeight ? "min-h-0 flex-1" : ""}`}>
+        <div className={`overflow-auto ${fillHeight ? "min-h-0 flex-1" : "h-[80vh]"}`}>
           <table className="w-full table-fixed border-collapse text-left">
             <colgroup>
               <col style={{ width: COL.rank }} />
@@ -322,51 +334,44 @@ export function PoControlTower({
               <col style={{ width: COL.poDate }} />
               <col style={{ width: COL.expiry }} />
               <col style={{ width: COL.delay }} />
-              <col style={{ width: COL.demand }} />
-              <col style={{ minWidth: 220 }} />
+              {/* No width/min-width here on purpose — under table-fixed,
+                  an unconstrained column absorbs 100% of whatever width
+                  is left over, which is what makes Reason/Action flex
+                  flush to the scrollbar instead of leaving a dead gap. */}
+              <col />
             </colgroup>
             <thead className="sticky top-0 z-20 bg-white text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:bg-neutral-900">
               <tr className="border-b border-frido-border dark:border-white/10">
-                <th className="po-table-sticky-col sticky z-20 bg-white px-1.5 py-1.5 dark:bg-neutral-900" style={{ left: STICKY_LEFT.rank }}>
+                <th className="po-table-sticky-col sticky z-20 bg-white px-2 py-2 dark:bg-neutral-900" style={{ left: STICKY_LEFT.rank }}>
                   #
                 </th>
-                <th className="po-table-sticky-col sticky z-20 bg-white px-1.5 py-1.5 dark:bg-neutral-900" style={{ left: STICKY_LEFT.priority }}>
+                <th className="po-table-sticky-col sticky z-20 bg-white px-2 py-2 dark:bg-neutral-900" style={{ left: STICKY_LEFT.priority }}>
                   Priority
                 </th>
-                <th className="po-table-sticky-col sticky z-20 bg-white px-1.5 py-1.5 dark:bg-neutral-900" style={{ left: STICKY_LEFT.poNumber }}>
+                <th className="po-table-sticky-col sticky z-20 bg-white px-2 py-2 dark:bg-neutral-900" style={{ left: STICKY_LEFT.poNumber }}>
                   PO Number
                 </th>
                 <th
-                  className="po-table-sticky-col sticky z-20 bg-white px-1.5 py-1.5 dark:bg-neutral-900"
+                  className="po-table-sticky-col sticky z-20 bg-white px-2 py-2 dark:bg-neutral-900"
                   style={{ left: STICKY_LEFT.marketplace, boxShadow: "2px 0 0 0 rgba(0,0,0,0.06)" }}
                 >
                   Mkt
                 </th>
-                <th className="px-1.5 py-1.5">City</th>
-                <th className="px-1.5 py-1.5">FC</th>
-                <th className="px-1.5 py-1.5 text-right">Qty</th>
-                <th className="px-1.5 py-1.5 text-right">Value</th>
-                <th className="px-1.5 py-1.5">PO Date</th>
-                <th className="px-1.5 py-1.5">Expiry</th>
-                <th className="px-1.5 py-1.5">Delay</th>
-                <th className="px-1.5 py-1.5" title="Demand Intelligence: contains a top-selling SKU for this marketplace">
-                  <Flame size={11} />
-                </th>
-                <th className="min-w-[220px] px-1.5 py-1.5">Reason / Action</th>
+                <th className="px-2 py-2">City</th>
+                <th className="px-2 py-2">FC</th>
+                <th className="px-2 py-2 text-right">Qty</th>
+                <th className="px-2 py-2 text-right">Value</th>
+                <th className="px-2 py-2">PO Date</th>
+                <th className="px-2 py-2">Expiry</th>
+                <th className="px-2 py-2">Delay</th>
+                <th className="px-2 py-2">Reason / Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-100 text-[13px] dark:divide-white/5">
+            <tbody className="divide-y divide-neutral-100 text-[14px] dark:divide-white/5">
               {sorted.map((r) => {
-                const topHit = r.demandHits[0];
-                const isHighDemand = topHit !== undefined && topHit.rank <= HIGH_DEMAND_RANK_THRESHOLD;
                 const reasonParts = buildReasonParts(r);
                 const primaryReason = reasonParts[0] ?? "—";
                 const moreCount = reasonParts.length - 1;
-                const demandTitle = r.demandHits.length
-                  ? r.demandHits
-                      .map((h) => `${h.sku} — ${r.po.marketplace} #${h.rank} best-seller (${fmtCurrency(h.gmv)} GMV, +${h.points})`)
-                      .join("\n")
-                  : undefined;
                 return (
                   <tr
                     key={r.po.id}
@@ -374,7 +379,7 @@ export function PoControlTower({
                     className={`group cursor-pointer transition-colors hover:bg-[var(--mp-primary)]/[0.06] ${ROW_HEIGHT}`}
                   >
                     <td
-                      className={`po-table-sticky-col sticky z-10 bg-white px-1.5 text-neutral-500 transition-colors group-hover:bg-[#fbf9f2] dark:bg-neutral-900 dark:group-hover:bg-neutral-800 ${
+                      className={`po-table-sticky-col sticky z-10 bg-white px-2 text-neutral-500 transition-colors group-hover:bg-[#fbf9f2] dark:bg-neutral-900 dark:group-hover:bg-neutral-800 ${
                         r.isOverdue ? "border-l-2 border-l-[#d03b3b]" : ""
                       }`}
                       style={{ left: STICKY_LEFT.rank }}
@@ -382,7 +387,7 @@ export function PoControlTower({
                       {r.rank || "—"}
                     </td>
                     <td
-                      className="po-table-sticky-col sticky z-10 bg-white px-1.5 transition-colors group-hover:bg-[#fbf9f2] dark:bg-neutral-900 dark:group-hover:bg-neutral-800"
+                      className="po-table-sticky-col sticky z-10 bg-white px-2 transition-colors group-hover:bg-[#fbf9f2] dark:bg-neutral-900 dark:group-hover:bg-neutral-800"
                       style={{ left: STICKY_LEFT.priority }}
                     >
                       <div className="flex h-full items-center gap-1">
@@ -391,41 +396,38 @@ export function PoControlTower({
                       </div>
                     </td>
                     <td
-                      className="po-table-sticky-col sticky z-10 truncate bg-white px-1.5 font-medium transition-colors group-hover:bg-[#fbf9f2] dark:bg-neutral-900 dark:group-hover:bg-neutral-800"
+                      className="po-table-sticky-col sticky z-10 truncate bg-white px-2 font-medium transition-colors group-hover:bg-[#fbf9f2] dark:bg-neutral-900 dark:group-hover:bg-neutral-800"
                       style={{ left: STICKY_LEFT.poNumber }}
                       title={r.po.id}
                     >
                       {r.po.id}
                     </td>
                     <td
-                      className="po-table-sticky-col sticky z-10 bg-white px-1.5 transition-colors group-hover:bg-[#fbf9f2] dark:bg-neutral-900 dark:group-hover:bg-neutral-800"
+                      className="po-table-sticky-col sticky z-10 bg-white px-2 transition-colors group-hover:bg-[#fbf9f2] dark:bg-neutral-900 dark:group-hover:bg-neutral-800"
                       style={{ left: STICKY_LEFT.marketplace, boxShadow: "2px 0 0 0 rgba(0,0,0,0.04)" }}
                     >
                       <div className="flex h-full items-center">
                         <MarketplaceBadge marketplace={r.po.marketplace} compact />
                       </div>
                     </td>
-                    <td className="truncate px-1.5" title={r.po.city}>
+                    <td className="truncate px-2" title={r.po.city}>
                       {r.po.city}
                     </td>
-                    <td className="truncate px-1.5 text-neutral-500" title={r.po.warehouse}>
+                    <td className="truncate px-2 text-neutral-500" title={r.po.warehouse}>
                       {r.po.warehouse}
                     </td>
-                    <td className="px-1.5 text-right tabular-nums">{r.po.pendingQty.toLocaleString("en-IN")}</td>
-                    <td className="px-1.5 text-right tabular-nums">{fmtCurrency(r.po.poValue)}</td>
-                    <td className="whitespace-nowrap px-1.5 text-neutral-500">{fmtShortDate(r.po.poRaisedDate)}</td>
-                    <td className="whitespace-nowrap px-1.5 text-neutral-500">{fmtShortDate(r.po.expiryDate)}</td>
-                    <td className="px-1.5">
+                    <td className="px-2 text-right tabular-nums">{r.po.pendingQty.toLocaleString("en-IN")}</td>
+                    <td className="px-2 text-right tabular-nums">{fmtCurrency(r.po.poValue)}</td>
+                    <td className="whitespace-nowrap px-2 text-neutral-500">{fmtShortDate(r.po.poRaisedDate)}</td>
+                    <td className="whitespace-nowrap px-2 text-neutral-500">{fmtShortDate(r.po.expiryDate)}</td>
+                    <td className="px-2">
                       <OperationalDelayBadge days={r.operationalDelayDays} compact />
                     </td>
-                    <td className="px-1.5 text-center" title={demandTitle}>
-                      {isHighDemand && <Flame size={12} className="mx-auto text-[#ec835a]" />}
-                    </td>
-                    <td className="min-w-[220px] px-1.5 text-neutral-500" title={reasonParts.join("\n")}>
+                    <td className="px-2 text-neutral-500" title={reasonParts.join("\n")}>
                       <div className="flex h-full items-center gap-1.5">
                         <span className="min-w-0 flex-1 truncate">{primaryReason}</span>
                         {moreCount > 0 && (
-                          <span className="shrink-0 whitespace-nowrap rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:bg-neutral-800">
+                          <span className="shrink-0 whitespace-nowrap rounded-md border border-frido-border bg-neutral-50 px-2 py-0.5 text-[10px] font-semibold text-neutral-600 dark:border-white/10 dark:bg-neutral-800 dark:text-neutral-300">
                             +{moreCount} more
                           </span>
                         )}

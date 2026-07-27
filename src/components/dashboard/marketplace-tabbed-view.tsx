@@ -139,9 +139,16 @@ export function MarketplaceTabbedView({
     { key: "top_skus", label: TAB_LABELS.top_skus, count: topSkuData?.rows.length ?? 0 },
   ];
 
+  const statusDropdown = <StatusDropdown options={tabs} active={activeTab} onChange={(key) => setActiveTab(key as TabKey)} />;
+  const isPendingOrCritical = activeTab === "pending" || activeTab === "critical";
+
   return (
-    <div className="space-y-1.5">
-      <StatusDropdown options={tabs} active={activeTab} onChange={(key) => setActiveTab(key as TabKey)} />
+    <div className="flex min-h-0 flex-1 flex-col gap-1.5">
+      {/* Pending/Critical fold the Status selector into PoControlTower's
+          own toolbar row (single toolbar, per the confirmed layout);
+          every other tab keeps it on its own line above that tab's
+          simpler, separately-toolbar'd table. */}
+      {!isPendingOrCritical && statusDropdown}
 
       {/* key={activeTab} forces a clean remount per tab — each status
           bucket starts with its own default filters rather than carrying
@@ -149,7 +156,7 @@ export function MarketplaceTabbedView({
       {activeTab === "all" && (
         <NeedsReviewPoTable key={activeTab} title="All POs" note="Every status, combined — read-only." pos={allPos} />
       )}
-      {(activeTab === "pending" || activeTab === "critical") && (
+      {isPendingOrCritical && (
         <PoControlTower
           key={activeTab}
           rows={pendingRows}
@@ -159,6 +166,8 @@ export function MarketplaceTabbedView({
           initialLevelFilter={activeTab === "critical" ? "Critical" : undefined}
           dateFilter={dateFilter}
           onDateFilterChange={onDateFilterChange}
+          leadingToolbarItem={statusDropdown}
+          fillHeight
         />
       )}
       {activeTab === "expired" && (
