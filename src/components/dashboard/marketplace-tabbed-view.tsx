@@ -168,6 +168,7 @@ export function MarketplaceTabbedView({
           onDateFilterChange={onDateFilterChange}
           leadingToolbarItem={statusDropdown}
           fillHeight
+          hideDonut
         />
       )}
       {activeTab === "expired" && (
