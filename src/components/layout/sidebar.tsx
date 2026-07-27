@@ -6,7 +6,6 @@ import { useState } from "react";
 import {
   LayoutDashboard,
   SlidersHorizontal,
-  FlaskConical,
   Settings,
   RefreshCw,
   ChevronsLeft,
@@ -21,7 +20,6 @@ const staticLinks = [{ href: "/", label: "Overview", icon: LayoutDashboard }];
 const toolLinks = [
   { href: "/rules-builder", label: "Rules Builder", icon: SlidersHorizontal },
   { href: "/data-sync", label: "Data Sync", icon: RefreshCw },
-  { href: "/simulator", label: "Simulator", icon: FlaskConical },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -46,7 +44,7 @@ function NavItem({
       title={collapsed ? label : undefined}
       className={`group flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[13px] font-medium transition-colors ${
         active
-          ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
+          ? "bg-frido-sidebarActive text-white dark:bg-white dark:text-neutral-900"
           : "text-white/85 hover:bg-white/10 dark:text-neutral-400 dark:hover:bg-neutral-800"
       }`}
     >

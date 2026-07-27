@@ -12,9 +12,10 @@ const config: Config = {
         low: "#0ca30c",
         frido: {
           yellow: "#FFC700",
-          bg: "#FFFCE0",
+          bg: "#F4F5F7",
           border: "#E4E4E4",
-          sidebar: "#03045E",
+          sidebar: "#0F172A",
+          sidebarActive: "#1E293B",
         },
       },
       fontFamily: {
