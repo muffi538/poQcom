@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { PoControlTower } from "@/components/dashboard/po-control-tower";
 import { PriorityDonutChart } from "@/components/dashboard/priority-donut-chart";
+import { CityDonutChart } from "@/components/dashboard/city-donut-chart";
 import { PoCharts } from "@/components/dashboard/po-charts";
 import { SecondaryPoTable } from "@/components/dashboard/secondary-po-table";
 import { DeliveredPoTable } from "@/components/dashboard/delivered-po-table";
@@ -22,7 +23,13 @@ import { EngineConfig } from "@/lib/config/engine-config";
 import { DemandIndex } from "@/lib/demand/rank";
 import { useDateFilter } from "@/lib/dashboard/use-date-filter";
 import { filterPurchaseOrdersByDate } from "@/lib/dashboard/date-filter";
-import { DEFAULT_PO_CONTROL_FILTERS, computeLevelCounts, filterRowsExceptLevel } from "@/lib/dashboard/po-control-filters";
+import {
+  DEFAULT_PO_CONTROL_FILTERS,
+  computeCityCounts,
+  computeLevelCounts,
+  filterRowsExceptCity,
+  filterRowsExceptLevel,
+} from "@/lib/dashboard/po-control-filters";
 
 function fmtNumber(n: number): string {
   return n.toLocaleString("en-IN");
@@ -128,10 +135,14 @@ export function OverviewClient({
     () => computeLevelCounts(filterRowsExceptLevel(pendingRows, poFilters)),
     [pendingRows, poFilters]
   );
+  const cityCounts = useMemo(
+    () => computeCityCounts(filterRowsExceptCity(pendingRows, poFilters)),
+    [pendingRows, poFilters]
+  );
 
   return (
     <div className="flex flex-col gap-1.5">
-      <div className="flex items-stretch gap-2">
+      <div className="flex items-start gap-2">
         <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
           <KpiCard label="Active PO" value={fmtNumber(summary.totalActive)} tone="accent" />
           <KpiCard label="Pending Qty" value={fmtNumber(summary.pendingQty)} />
@@ -149,7 +160,10 @@ export function OverviewClient({
           <KpiCard label="Expiring <10 Days" value={fmtNumber(summary.expiringWithin10Days)} tone="high" />
         </div>
 
-        <div className="w-[280px] shrink-0">
+        {/* Stacked (not stretched full-height) so each donut sizes to its
+            own content — two natural-height cards fill the space beside
+            the KPI grid instead of one card stretched with dead space. */}
+        <div className="flex w-[360px] shrink-0 flex-col gap-2">
           <PriorityDonutChart
             counts={levelCounts}
             activeLevel={poFilters.levelFilter}
@@ -157,6 +171,11 @@ export function OverviewClient({
               setPoFilters((f) => ({ ...f, levelFilter: level === f.levelFilter ? "all" : level }))
             }
             variant="large"
+          />
+          <CityDonutChart
+            slices={cityCounts}
+            activeCity={poFilters.cityFilter}
+            onSelectCity={(city) => setPoFilters((f) => ({ ...f, cityFilter: city === f.cityFilter ? "all" : city }))}
           />
         </div>
       </div>

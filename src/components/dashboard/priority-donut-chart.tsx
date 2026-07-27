@@ -32,14 +32,15 @@ const VARIANTS = {
     centerTotal: "text-[11px]",
     centerLabel: "mt-0.5 text-[6px]",
   },
-  // Legend stacks in a single column here (vs. compact's 2x2 grid) —
-  // beside a full 2-row-tall KPI block there's plenty of height but not
-  // much spare width, and 4 rows of "dot / level / count / pct" each get
-  // to breathe instead of being squeezed two-per-line.
+  // Legend stacks in a single column here (vs. compact's 2x2 grid) — 4
+  // rows of "dot / level / count / pct" each get to breathe instead of
+  // being squeezed two-per-line. Sized to its own content (not stretched
+  // full-height) — it sits stacked with CityDonutChart in the same
+  // column beside the KPI grid, rather than alone with dead space below.
   large: {
     size: 104,
     stroke: 16,
-    wrapper: "h-full w-full gap-5 px-6 py-4",
+    wrapper: "w-full gap-5 px-6 py-4",
     legendCols: "grid-cols-1",
     gridGap: "gap-y-2",
     legendItem: "w-full gap-2 whitespace-nowrap px-1.5 py-1 text-sm",
@@ -67,7 +68,7 @@ export function PriorityDonutChart({
 
   if (total === 0) {
     return (
-      <div className={`glass-card flex items-center justify-center rounded-card px-3 py-1 text-xs text-neutral-500 ${variant === "large" ? "h-full w-full" : "w-fit"}`}>
+      <div className={`glass-card flex items-center justify-center rounded-card px-3 text-xs text-neutral-500 ${variant === "large" ? "w-full py-4" : "w-fit py-1"}`}>
         No Pending POs match the current filters.
       </div>
     );
