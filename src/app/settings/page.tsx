@@ -103,8 +103,8 @@ export default async function SettingsPage() {
           </div>
 
           <p className="mt-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
-            Also read-only for now — stored in <code>.data/engine-config.json</code>; an edit form
-            is next once the Rules Builder itself is interactive.
+            Also read-only for now — stored in Supabase&apos;s <code>settings</code> table; an edit
+            form is next once the Rules Builder itself is interactive.
           </p>
         </div>
       </div>
