@@ -8,18 +8,21 @@ import {
   SlidersHorizontal,
   Settings,
   RefreshCw,
+  ShieldCheck,
+  LogOut,
   ChevronsLeft,
   ChevronsRight,
   type LucideIcon,
 } from "lucide-react";
 import { MARKETPLACES, marketplaceSlug } from "@/types/marketplace";
 import { MARKETPLACE_THEMES } from "@/lib/theme/marketplace-colors";
+import { logoutAction } from "@/lib/auth/logout-action";
 
-const staticLinks = [{ href: "/", label: "Overview", icon: LayoutDashboard }];
+const staticLinks = [{ href: "/", pageKey: "overview", label: "Overview", icon: LayoutDashboard }];
 const toolLinks = [
-  { href: "/rules-builder", label: "Rules Builder", icon: SlidersHorizontal },
-  { href: "/data-sync", label: "Data Sync", icon: RefreshCw },
-  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/rules-builder", pageKey: "rules-builder", label: "Rules Builder", icon: SlidersHorizontal },
+  { href: "/data-sync", pageKey: "data-sync", label: "Data Sync", icon: RefreshCw },
+  { href: "/settings", pageKey: "settings", label: "Settings", icon: Settings },
 ];
 
 function NavItem({
@@ -60,9 +63,22 @@ function NavItem({
   );
 }
 
-export function Sidebar() {
+export function Sidebar({
+  isAdmin,
+  allowedPages,
+  email,
+}: {
+  isAdmin: boolean;
+  allowedPages: string[];
+  email: string;
+}) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  // Admins bypass the per-page allow-list entirely (see src/proxy.ts) —
+  // the Sidebar mirrors that so an admin never sees a page hidden from
+  // them just because nobody granted their own account explicit access.
+  const canSee = (key: string) => isAdmin || allowedPages.includes(key);
+  const visibleMarketplaces = MARKETPLACES.filter((m) => canSee(marketplaceSlug(m)));
 
   return (
     <aside
@@ -83,16 +99,18 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-1.5">
-        {staticLinks.map((l) => (
-          <NavItem key={l.href} {...l} active={pathname === l.href} collapsed={collapsed} />
-        ))}
+        {staticLinks
+          .filter((l) => canSee(l.pageKey))
+          .map(({ pageKey, ...l }) => (
+            <NavItem key={l.href} {...l} active={pathname === l.href} collapsed={collapsed} />
+          ))}
 
-        {!collapsed && (
+        {!collapsed && visibleMarketplaces.length > 0 && (
           <div className="px-2.5 pb-0.5 pt-3 text-[10px] font-semibold uppercase tracking-wide text-white/60 dark:text-neutral-400">
             Marketplaces
           </div>
         )}
-        {MARKETPLACES.map((m) => {
+        {visibleMarketplaces.map((m) => {
           const href = `/marketplaces/${marketplaceSlug(m)}`;
           return (
             <NavItem
@@ -106,17 +124,43 @@ export function Sidebar() {
           );
         })}
 
-        {!collapsed && (
+        {!collapsed && (toolLinks.some((l) => canSee(l.pageKey)) || isAdmin) && (
           <div className="px-2.5 pb-0.5 pt-3 text-[10px] font-semibold uppercase tracking-wide text-white/60 dark:text-neutral-400">
             Tools
           </div>
         )}
-        {toolLinks.map((l) => (
-          <NavItem key={l.href} {...l} active={pathname === l.href} collapsed={collapsed} />
-        ))}
+        {toolLinks
+          .filter((l) => canSee(l.pageKey))
+          .map(({ pageKey, ...l }) => (
+            <NavItem key={l.href} {...l} active={pathname === l.href} collapsed={collapsed} />
+          ))}
+        {isAdmin && (
+          <NavItem
+            href="/admin"
+            label="Admin"
+            icon={ShieldCheck}
+            active={pathname === "/admin"}
+            collapsed={collapsed}
+          />
+        )}
       </nav>
 
       <div className="m-2 space-y-2">
+        {!collapsed && email && (
+          <div className="truncate px-1 text-[11px] text-white/60 dark:text-neutral-500" title={email}>
+            {email}
+          </div>
+        )}
+        <form action={logoutAction}>
+          <button
+            type="submit"
+            title={collapsed ? "Log out" : undefined}
+            className="flex w-full items-center justify-center gap-2 rounded-md border border-white/20 py-1.5 text-xs text-white/80 transition-colors hover:bg-white/10 dark:border-white/10 dark:text-neutral-500 dark:hover:bg-neutral-900"
+          >
+            <LogOut size={14} />
+            {!collapsed && "Log out"}
+          </button>
+        </form>
         <button
           onClick={() => setCollapsed((c) => !c)}
           className="flex w-full items-center justify-center gap-2 rounded-md border border-white/20 py-1.5 text-xs text-white/80 transition-colors hover:bg-white/10 dark:border-white/10 dark:text-neutral-500 dark:hover:bg-neutral-900"

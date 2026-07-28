@@ -13,7 +13,7 @@ import {
   runDispatchSync,
   runSyncAll,
   saveAutoSyncSettings,
-} from "@/app/data-sync/actions";
+} from "@/app/(app)/data-sync/actions";
 import { WorkbookType } from "@/lib/import/field-mappings";
 
 interface Marketplace {
