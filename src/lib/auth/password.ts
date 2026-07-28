@@ -21,3 +21,17 @@ export function verifyPassword(password: string, stored: string): boolean {
   if (candidate.length !== hashBuffer.length) return false;
   return timingSafeEqual(new Uint8Array(candidate), new Uint8Array(hashBuffer));
 }
+
+// Minimum length + character-class variety — a pragmatic strength rule
+// (not just "6 characters") without demanding a specific special
+// character set that tends to just push people toward "Passw0rd!".
+// Returns an error message, or null when the password is strong enough.
+export function validatePasswordStrength(password: string): string | null {
+  if (password.length < 10) return "Password must be at least 10 characters.";
+  if (password.length > 128) return "Password must be at most 128 characters.";
+  const classes = [/[a-z]/, /[A-Z]/, /[0-9]/, /[^a-zA-Z0-9]/].filter((re) => re.test(password)).length;
+  if (classes < 3) {
+    return "Password must include at least 3 of: lowercase, uppercase, numbers, symbols.";
+  }
+  return null;
+}

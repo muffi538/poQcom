@@ -11,8 +11,7 @@ import { DeliveredPoTable } from "@/components/dashboard/delivered-po-table";
 import { OperationalPoTable } from "@/components/dashboard/operational-po-table";
 import { NeedsReviewPoTable } from "@/components/dashboard/needs-review-po-table";
 import { DemandIntelligenceTabs } from "@/components/dashboard/demand-intelligence-tabs";
-import { SUPPORTED_MARKETPLACES, SupportedMarketplace } from "@/lib/sheets/marketplaces";
-import { MARKETPLACES } from "@/types/marketplace";
+import { SupportedMarketplace } from "@/lib/sheets/marketplaces";
 import { buildTopSkuTable, TopSkuTableResult } from "@/lib/demand/sku-table";
 import { buildExecutiveSummary } from "@/lib/dashboard/summary";
 import { buildPoRows } from "@/lib/dashboard/po-rows";
@@ -58,12 +57,18 @@ export function OverviewClient({
   config,
   demandIndex,
   demandError,
+  marketplaces,
 }: {
   pos: PurchaseOrder[];
   rules: Rule[];
   config: EngineConfig;
   demandIndex: DemandIndex;
   demandError: string | null;
+  // Already scoped by the page to whatever this signed-in user is
+  // actually permitted to see (or every marketplace, for an admin) —
+  // never the full static list, so KPIs/donuts/table/Top SKUs here
+  // can't leak another marketplace's data just because it exists.
+  marketplaces: string[];
 }) {
   const [dateFilter, setDateFilter] = useDateFilter();
   const hasRules = rules.some((r) => r.enabled);
@@ -121,11 +126,11 @@ export function OverviewClient({
       lowValuePos: byStatus.get("low_value_cant_dispatch") ?? [],
       needsReviewPos: byStatus.get("needs_review") ?? [],
       topSkuByMarketplace: Object.fromEntries(
-        SUPPORTED_MARKETPLACES.map((m: SupportedMarketplace) => [m, buildTopSkuTable(m, demandIndex, pendingPos)])
+        marketplaces.map((m) => [m, buildTopSkuTable(m as SupportedMarketplace, demandIndex, pendingPos)])
       ) as Record<string, TopSkuTableResult>,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pos, rules, config, demandIndex, dateFilter]);
+  }, [pos, rules, config, demandIndex, dateFilter, marketplaces]);
 
   const levelCounts = useMemo(
     () => computeLevelCounts(filterRowsExceptLevel(pendingRows, poFilters)),
@@ -167,7 +172,7 @@ export function OverviewClient({
 
       <PoControlTower
         rows={pendingRows}
-        marketplaces={[...MARKETPLACES]}
+        marketplaces={marketplaces}
         hasRules={hasRules}
         demandError={demandError}
         dateFilter={dateFilter}
@@ -176,7 +181,7 @@ export function OverviewClient({
         onFiltersChange={setPoFilters}
         hideDonut
       />
-      <DemandIntelligenceTabs marketplaces={[...MARKETPLACES]} data={topSkuByMarketplace} />
+      <DemandIntelligenceTabs marketplaces={marketplaces} data={topSkuByMarketplace} />
       <details className="glass-card rounded-lg px-3 py-1.5 text-xs">
         <summary className="cursor-pointer select-none font-medium text-neutral-500">
           Expired, Delivered, Dispatched, In Transit, Scheduled, Cancelled, Low Value, Needs Review, and Charts

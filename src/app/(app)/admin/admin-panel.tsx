@@ -125,6 +125,7 @@ function AddUserForm({ allPages }: { allPages: PageDef[] }) {
         <div>
           <label className="mb-1 block text-xs font-medium text-neutral-600">Temporary password</label>
           <input value={password} onChange={(e) => setPassword(e.target.value)} type="text" className={inputClasses} />
+          <p className="mt-1 text-[11px] text-neutral-400">At least 10 characters, 3 of: lowercase/uppercase/numbers/symbols.</p>
         </div>
       </div>
       <div>
@@ -135,7 +136,7 @@ function AddUserForm({ allPages }: { allPages: PageDef[] }) {
       <div className="flex gap-2">
         <button
           onClick={submit}
-          disabled={pending || !email || !password}
+          disabled={pending || !email || password.length < 10}
           className="flex items-center gap-1.5 rounded-lg bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-neutral-800 disabled:opacity-60"
         >
           {pending && <Loader2 size={12} className="animate-spin" />}
@@ -271,13 +272,16 @@ function UserRow({ user, allPages, isSelf }: { user: AdminUserRow; allPages: Pag
                     setPasswordDraft("");
                   }, "Password updated.")
                 }
-                disabled={pending || passwordDraft.length < 6}
+                disabled={pending || passwordDraft.length < 10}
                 className="flex items-center gap-1.5 rounded-lg border border-frido-border px-2.5 py-1.5 text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-50 disabled:opacity-50"
               >
                 <KeyRound size={12} />
                 Set password
               </button>
             </div>
+            <p className="mt-1 text-[11px] text-neutral-400">
+              At least 10 characters, 3 of: lowercase/uppercase/numbers/symbols.
+            </p>
           </div>
         </div>
       )}

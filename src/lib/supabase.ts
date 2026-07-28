@@ -1,18 +1,28 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
-// Singleton Supabase client — created once per process/bundle rather
-// than per call site, so every caller shares the same underlying
-// connection/auth state instead of each spinning up its own. Uses the
-// public URL/anon key (safe to expose to the browser via NEXT_PUBLIC_*),
-// not a service-role key, so this client is only as privileged as
-// whatever Row Level Security policies allow.
+// Server-only service-role client — every table's RLS denies the anon
+// role by default (see supabase/migrations/0014_lock_down_rls.sql), so
+// the app's own server code needs the service-role key to read/write
+// anything at all. This file is never imported by a "use client"
+// component (confirmed: the whole app only ever talks to Supabase from
+// Server Components/Actions/proxy.ts) — SUPABASE_SERVICE_ROLE_KEY is
+// NOT prefixed NEXT_PUBLIC_, so Next.js never inlines it into a
+// browser bundle even if that changed by accident; it simply wouldn't
+// resolve client-side.
+//
+// Authorization for what an individual logged-in user can see/do lives
+// in the Next.js app layer (src/proxy.ts + src/lib/auth/*), not in
+// Postgres RLS — this client is intentionally as privileged as the
+// database allows, same as any other server-side ORM/admin connection.
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
+if (!supabaseUrl || !supabaseServiceRoleKey) {
   throw new Error(
-    "Supabase is not configured — set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env."
+    "Supabase is not configured — set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env (the service-role key, from Project Settings → API — never the anon key)."
   );
 }
 
-export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
+  auth: { autoRefreshToken: false, persistSession: false },
+});

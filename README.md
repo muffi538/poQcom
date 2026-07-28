@@ -659,6 +659,61 @@ silently dropped.
 
 ```
 npm install
-cp .env.example .env   # already points at your sheet — no service account needed
+cp .env.example .env   # then fill in SUPABASE_SERVICE_ROLE_KEY — see Security below
 npm run dev
 ```
+
+## Security
+
+Login is a bespoke admin-managed system (`src/lib/auth/*`, `src/app/login/*`,
+`src/app/(app)/admin/*`) — not Supabase Auth. There's no self-signup: an admin
+creates every account from `/admin` and chooses exactly which pages it can see.
+
+- **Passwords**: Node's built-in `scrypt` (`src/lib/auth/password.ts`), not a
+  third-party hashing library. Enforced strength: 10+ characters, at least 3
+  of lowercase/uppercase/digit/symbol.
+- **Sessions**: opaque random tokens in `app_sessions`, not JWTs — disabling
+  or deleting a user revokes access on their very next request instead of
+  waiting for a token to expire. Cookie is `httpOnly`, `secure` in production,
+  `sameSite: lax`.
+- **Rate limiting**: 5 failed login attempts for the same email within 15
+  minutes blocks further tries for the rest of that window (`login_attempts`
+  table, `src/lib/auth/rate-limit.ts`), checked before the password is even
+  verified.
+- **Authorization**: `src/proxy.ts` is the single gate — every route requires
+  a valid session; non-admins are further checked against their
+  `user_page_permissions` allow-list (`src/lib/auth/pages.ts`). Admin
+  actions and Data Sync actions independently re-check permissions
+  server-side too (`requireAdmin`/`requirePagePermission` in
+  `src/lib/auth/session.ts`), so a Server Action can't be invoked around
+  the page-level gate. The Overview page filters its own PO data down to
+  only the marketplaces the signed-in user is actually permitted to see
+  before it ever reaches the client.
+- **Database**: every table has Row Level Security enabled with **no
+  policies** — `anon`/`authenticated` get zero access by default. The app's
+  own server code talks to Supabase exclusively through the `service_role`
+  key (`src/lib/supabase.ts`), which bypasses RLS by Supabase's design; that
+  key must never be prefixed `NEXT_PUBLIC_` or referenced from a `"use
+  client"` file. See `supabase/migrations/0014_lock_down_rls.sql`.
+- **Input validation**: every Server Action validates its inputs with `zod`
+  before touching the database (email/password shape, UUID params, and an
+  explicit allow-list check for page-permission keys).
+- **Audit log**: `activity_logs` (via `src/lib/audit/log.ts`) records login
+  success/failure/lockout, logout, every admin action (user created/deleted/
+  enabled/disabled, password reset, permissions changed), and every sync
+  trigger/sheet-connection change — actor id, action, and non-sensitive
+  metadata only. Passwords and session tokens are never logged.
+- **Security headers**: CSP, HSTS, `X-Frame-Options: DENY`,
+  `X-Content-Type-Options: nosniff`, `Referrer-Policy`, and
+  `Permissions-Policy` are set for every route in `next.config.js`.
+
+**Known gaps, deliberately not solved here:**
+- No self-service email verification or password-reset flow — those need
+  Supabase Auth's built-in email provider, which this app doesn't use (an
+  admin resets a user's password directly from `/admin` instead).
+- No file-upload feature exists yet (Stage 6 in "Confirmed but not yet
+  implemented" above), so there's nothing to validate there today — revisit
+  file-type/size/extension checks and random filenames when that's built.
+- `sharp` (Next's image-optimization dependency) has an open CVE with no
+  non-breaking fix available yet; irrelevant in practice since this app
+  never uses `next/image`.

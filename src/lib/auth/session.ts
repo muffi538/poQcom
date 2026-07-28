@@ -5,7 +5,7 @@ import { SESSION_COOKIE } from "@/lib/auth/constants";
 
 // Only ever imported from Server Components/Actions — never from
 // middleware (next/headers isn't available there, see constants.ts) or
-// a "use client" file — so the anon-key Supabase client here stays
+// a "use client" file — so the service-role Supabase client here stays
 // server-side only, same boundary the rest of the app already relies on
 // (see src/lib/supabase.ts).
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
@@ -80,5 +80,17 @@ export async function getSessionUser(): Promise<SessionUser | null> {
 export async function requireAdmin(): Promise<SessionUser> {
   const user = await getSessionUser();
   if (!user || !user.isAdmin) throw new Error("Admin access required.");
+  return user;
+}
+
+// Defense-in-depth for Server Actions bound to a permission-gated page
+// (e.g. Data Sync) — proxy.ts already blocks navigating to the page
+// itself, but a Server Action is its own callable endpoint, so it
+// re-checks the same permission independently rather than trusting that
+// only an authorized user could ever have triggered it.
+export async function requirePagePermission(pageKey: string): Promise<SessionUser> {
+  const user = await getSessionUser();
+  if (!user) throw new Error("Authentication required.");
+  if (!user.isAdmin && !user.pageKeys.includes(pageKey)) throw new Error("You don't have permission to do that.");
   return user;
 }
