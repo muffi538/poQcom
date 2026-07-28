@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search, SearchX, ArrowUpDown, AlertTriangle } from "lucide-react";
+import { Search, SearchX, ArrowUp, ArrowDown, ArrowUpDown, AlertTriangle } from "lucide-react";
 import { PoRow } from "@/lib/dashboard/po-rows";
 import { PriorityBadge } from "./priority-badge";
 import { MarketplaceBadge } from "./marketplace-badge";
@@ -190,6 +190,11 @@ export function PoControlTower({
   hideDonut,
 }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>("priority");
+  // Only the Qty column has its own click-to-toggle header (the rest of
+  // the columns are only reorderable via the Sort dropdown, whose other
+  // entries each have one fixed, sensible direction baked in — Qty is
+  // the one people want to flip between largest/smallest on the fly).
+  const [qtySortDir, setQtySortDir] = useState<"asc" | "desc">("desc");
   const [internalFilters, setInternalFilters] = useState<PoControlFilters>({
     ...DEFAULT_PO_CONTROL_FILTERS,
     levelFilter: initialLevelFilter ?? "all",
@@ -223,7 +228,23 @@ export function PoControlTower({
 
   const filtered = useMemo(() => filterRowsByLevel(filteredExceptLevel, levelFilter), [filteredExceptLevel, levelFilter]);
 
-  const sorted = useMemo(() => [...filtered].sort(SORTERS[sortKey]), [filtered, sortKey]);
+  const sorted = useMemo(() => {
+    const cmp = SORTERS[sortKey];
+    // SORTERS.qty is written descending ("Largest Qty" first) — flip it
+    // when the header's been toggled to ascending. Every other sort key
+    // ignores qtySortDir entirely, so this can't change their behavior.
+    const dir = sortKey === "qty" && qtySortDir === "asc" ? -1 : 1;
+    return [...filtered].sort((a, b) => cmp(a, b) * dir);
+  }, [filtered, sortKey, qtySortDir]);
+
+  function handleQtySort() {
+    if (sortKey === "qty") {
+      setQtySortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey("qty");
+      setQtySortDir("desc");
+    }
+  }
 
   // Exports exactly what's currently filtered/sorted on screen, not the
   // full unfiltered rows — so the download matches what the user is
@@ -278,10 +299,23 @@ export function PoControlTower({
 
           <div className={`relative ${title ? "" : "ml-auto"}`}>
             <ArrowUpDown size={12} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-neutral-400" />
-            <select value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)} className={`${inputClasses} pl-6`}>
+            <select
+              value={sortKey}
+              onChange={(e) => {
+                const key = e.target.value as SortKey;
+                // Picking "Qty" from the dropdown always means descending
+                // (matches its label) — ascending is only reachable via
+                // the header's own toggle, which starts from descending.
+                if (key === "qty") setQtySortDir("desc");
+                setSortKey(key);
+              }}
+              className={`${inputClasses} pl-6`}
+            >
               {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
                 <option key={k} value={k}>
-                  Sort: {SORT_LABELS[k]}
+                  {/* "Qty" is the one label that reflects the header's own
+                      asc/desc toggle instead of a fixed direction. */}
+                  Sort: {k === "qty" ? (qtySortDir === "asc" ? "Smallest Qty" : "Largest Qty") : SORT_LABELS[k]}
                 </option>
               ))}
             </select>
@@ -356,7 +390,23 @@ export function PoControlTower({
                 </th>
                 <th className="px-2 py-2">City</th>
                 <th className="px-2 py-2">FC</th>
-                <th className="px-2 py-2 text-right">Qty</th>
+                <th className="px-2 py-2 text-right">
+                  <button
+                    onClick={handleQtySort}
+                    className="ml-auto flex items-center gap-0.5 uppercase tracking-wide text-neutral-500 transition-colors hover:text-neutral-900 dark:hover:text-white"
+                  >
+                    Qty
+                    {sortKey === "qty" ? (
+                      qtySortDir === "asc" ? (
+                        <ArrowUp size={11} className="shrink-0" />
+                      ) : (
+                        <ArrowDown size={11} className="shrink-0" />
+                      )
+                    ) : (
+                      <ArrowUpDown size={11} className="shrink-0 opacity-30" />
+                    )}
+                  </button>
+                </th>
                 <th className="px-2 py-2 text-right">Value</th>
                 <th className="px-2 py-2">PO Date</th>
                 <th className="px-2 py-2">Expiry</th>

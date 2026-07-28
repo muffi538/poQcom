@@ -36,7 +36,12 @@ export function KpiCard({
         {label}
       </div>
       <div
-        className="mt-1 truncate text-[34px] font-extrabold leading-none tabular-nums text-neutral-900 dark:text-neutral-50"
+        // pb-1 gives descenders (g, y, p, q, j) room below the line box —
+        // without it, `truncate`'s overflow-hidden clips them off at this
+        // font-size/weight (confirmed: "Gurgaon" lost the bottom of its
+        // "g"). leading-none stays, so this doesn't loosen the tight
+        // number-stack look, just stops the clipping.
+        className="mt-1 truncate pb-1 text-[34px] font-extrabold leading-none tabular-nums text-neutral-900 dark:text-neutral-50"
         title={String(value)}
       >
         {value}
