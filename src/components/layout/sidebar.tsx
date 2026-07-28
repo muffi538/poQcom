@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
   LayoutDashboard,
-  SlidersHorizontal,
   Settings,
   RefreshCw,
   ShieldCheck,
@@ -136,22 +135,13 @@ export function Sidebar({
             <NavItem key={l.href} {...l} active={pathname === l.href} collapsed={collapsed} />
           ))}
         {isAdmin && (
-          <>
-            <NavItem
-              href="/rules-builder"
-              label="Rules Builder"
-              icon={SlidersHorizontal}
-              active={pathname === "/rules-builder"}
-              collapsed={collapsed}
-            />
-            <NavItem
-              href="/admin"
-              label="Admin"
-              icon={ShieldCheck}
-              active={pathname === "/admin"}
-              collapsed={collapsed}
-            />
-          </>
+          <NavItem
+            href="/admin"
+            label="Admin"
+            icon={ShieldCheck}
+            active={pathname === "/admin"}
+            collapsed={collapsed}
+          />
         )}
       </nav>
 

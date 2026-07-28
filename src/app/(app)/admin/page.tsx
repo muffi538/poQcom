@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
+import { SlidersHorizontal } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { getSessionUser } from "@/lib/auth/session";
 import { ALL_PAGES } from "@/lib/auth/pages";
@@ -28,12 +30,24 @@ export default async function AdminPage() {
 
   return (
     <div className="max-w-4xl space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Admin</h1>
-        <p className="text-sm text-neutral-500">
-          Create and manage logins. Only accounts added here can sign in — there&apos;s no
-          self-signup.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Admin</h1>
+          <p className="text-sm text-neutral-500">
+            Create and manage logins. Only accounts added here can sign in — there&apos;s no
+            self-signup.
+          </p>
+        </div>
+        {/* Rules Builder lives here, not in the main sidebar — it's a
+            backend/admin tool, not something regular users should ever
+            see in the public dashboard nav. */}
+        <Link
+          href="/rules-builder"
+          className="flex items-center gap-1.5 rounded-lg bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-neutral-800"
+        >
+          <SlidersHorizontal size={13} />
+          Rules Builder
+        </Link>
       </div>
       <AdminPanel users={users} allPages={ALL_PAGES} currentUserId={user.id} />
     </div>
