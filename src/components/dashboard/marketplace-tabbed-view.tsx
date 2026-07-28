@@ -144,11 +144,10 @@ export function MarketplaceTabbedView({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-1.5">
-      {/* Pending/Critical fold the Status selector into PoControlTower's
-          own toolbar row (single toolbar, per the confirmed layout);
-          every other tab keeps it on its own line above that tab's
-          simpler, separately-toolbar'd table. */}
-      {!isPendingOrCritical && statusDropdown}
+      {/* Same own-line placement for every tab, including Pending/Critical
+          — keeps the Status selector uniform across the whole page
+          instead of being folded into just one tab's table. */}
+      {statusDropdown}
 
       {/* key={activeTab} forces a clean remount per tab — each status
           bucket starts with its own default filters rather than carrying
@@ -166,7 +165,7 @@ export function MarketplaceTabbedView({
           initialLevelFilter={activeTab === "critical" ? "Critical" : undefined}
           dateFilter={dateFilter}
           onDateFilterChange={onDateFilterChange}
-          leadingToolbarItem={statusDropdown}
+          title="Pending POs"
           fillHeight
           hideDonut
         />
