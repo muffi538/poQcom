@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { PriorityDonutChart } from "@/components/dashboard/priority-donut-chart";
 import { MarketplaceTabbedView } from "@/components/dashboard/marketplace-tabbed-view";
-import { computeLevelCounts } from "@/lib/dashboard/po-control-filters";
+import { computeLevelCounts, computeTopCity } from "@/lib/dashboard/po-control-filters";
 import { SupportedMarketplace } from "@/lib/sheets/marketplaces";
 import { buildTopSkuTable } from "@/lib/demand/sku-table";
 import { buildExecutiveSummary } from "@/lib/dashboard/summary";
@@ -112,6 +112,10 @@ export function MarketplacePageClient({
   // over every visible Pending PO for this marketplace) — not reactive to
   // the table's own toolbar filters below, same as those KPI numbers aren't.
   const levelCounts = useMemo(() => computeLevelCounts(pendingRows), [pendingRows]);
+  // Same "big picture" scope as the other KPI cards — the highest-count
+  // city among every visible Pending PO, not reactive to the table's own
+  // toolbar City filter below.
+  const topCity = useMemo(() => computeTopCity(pendingRows), [pendingRows]);
 
   return (
     <>
@@ -121,7 +125,12 @@ export function MarketplacePageClient({
           <KpiCard label="Expired Pending" value={summary.expiredPending} tone="critical" />
           <KpiCard label="Pending Qty" value={summary.pendingQty} tone="accent" />
           <KpiCard label="Avg Dispatch" value={fmtDays(summary.avgDispatchTimeDays)} tone="accent" />
-          <KpiCard label="Avg Appt Delay" value={fmtDays(summary.avgAppointmentDelayDays)} tone="accent" />
+          <KpiCard
+            label="Top City"
+            value={topCity ? topCity.city : "—"}
+            sub={topCity ? `${topCity.count} PO${topCity.count === 1 ? "" : "s"}` : undefined}
+            tone="accent"
+          />
           <KpiCard
             label="Avg Days Late"
             value={summary.avgOperationalDelayDaysLate === null ? "—" : `${summary.avgOperationalDelayDaysLate.toFixed(1)}d`}

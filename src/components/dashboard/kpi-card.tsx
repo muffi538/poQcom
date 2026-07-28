@@ -16,10 +16,15 @@ export function KpiCard({
   label,
   value,
   tone = "default",
+  sub,
 }: {
   label: string;
   value: string | number;
   tone?: "default" | "critical" | "high" | "medium" | "low" | "accent";
+  // Optional second line under the value (e.g. a PO count under a city
+  // name) — omitted by every KPI that's a single number, so this adds no
+  // visual weight to cards that don't pass it.
+  sub?: string;
 }) {
   const accent = TONE_ACCENT[tone] ?? TONE_ACCENT.default;
   return (
@@ -36,6 +41,7 @@ export function KpiCard({
       >
         {value}
       </div>
+      {sub && <div className="mt-1 truncate text-xs font-medium text-neutral-500">{sub}</div>}
     </div>
   );
 }

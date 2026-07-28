@@ -17,7 +17,6 @@ export interface ExecutiveSummary {
   pendingQty: number;
   pendingValue: number;
   avgDispatchTimeDays: number | null;
-  avgAppointmentDelayDays: number | null;
   avgOperationalDelayDaysLate: number | null; // average lateness among the currently-overdue only
 }
 
@@ -45,7 +44,6 @@ export function buildExecutiveSummary(
   const pendingPos = pos.filter((po) => isPendingStatus(po.status));
 
   const dispatchTimes: number[] = [];
-  const appointmentDelays: number[] = [];
   const operationalDelaysLate: number[] = [];
 
   let critical = 0,
@@ -82,22 +80,15 @@ export function buildExecutiveSummary(
     }
   }
 
-  // Dispatch time and appointment delay are historical/informational, so
-  // they look across every visible PO (Pending, Expired, Dispatched,
-  // Delivered, Needs Review) — Dispatched/Delivered are the ones that
-  // actually carry a real Dispatch Date, so including them here (instead
-  // of excluding them from the dashboard entirely) is what gives this
-  // average real data to work with.
+  // Dispatch time is historical/informational, so it looks across every
+  // visible PO (Pending, Expired, Dispatched, Delivered, Needs Review) —
+  // Dispatched/Delivered are the ones that actually carry a real Dispatch
+  // Date, so including them here (instead of excluding them from the
+  // dashboard entirely) is what gives this average real data to work with.
   for (const po of pos) {
     if (po.dispatchDate) {
       const dispatchTime = daysBetween(po.poRaisedDate, po.dispatchDate);
       if (Number.isFinite(dispatchTime)) dispatchTimes.push(dispatchTime);
-    }
-    if (po.appointmentDate) {
-      const timeline = computeTimeline(po, config, today);
-      if (timeline.appointmentDelayDays !== null) {
-        appointmentDelays.push(timeline.appointmentDelayDays);
-      }
     }
   }
 
@@ -110,7 +101,6 @@ export function buildExecutiveSummary(
     pendingQty,
     pendingValue,
     avgDispatchTimeDays: average(dispatchTimes),
-    avgAppointmentDelayDays: average(appointmentDelays),
     avgOperationalDelayDaysLate: average(operationalDelaysLate),
   };
 }

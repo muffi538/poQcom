@@ -94,3 +94,23 @@ export function computeCityCounts(rows: PoRow[], topN = 5): CitySlice[] {
   const otherCount = sorted.slice(topN).reduce((sum, s) => sum + s.count, 0);
   return otherCount > 0 ? [...top, { city: "Other", count: otherCount }] : top;
 }
+
+export interface TopCityResult {
+  city: string;
+  count: number;
+}
+
+// The single highest-count city — ties broken alphabetically so the KPI
+// is deterministic regardless of which PO happened to appear first in
+// the data, not just "whichever the Map iterates to last".
+export function computeTopCity(rows: PoRow[]): TopCityResult | null {
+  const counts = new Map<string, number>();
+  for (const r of rows) counts.set(r.po.city, (counts.get(r.po.city) ?? 0) + 1);
+  let best: TopCityResult | null = null;
+  for (const [city, count] of counts) {
+    if (!best || count > best.count || (count === best.count && city < best.city)) {
+      best = { city, count };
+    }
+  }
+  return best;
+}
