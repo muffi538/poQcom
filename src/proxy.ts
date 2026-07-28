@@ -9,7 +9,9 @@ import { SESSION_COOKIE } from "@/lib/auth/constants";
 //   1. A valid, non-expired session for an enabled user (else -> /login).
 //   2. That user's page-permission allow-list, when the path resolves to
 //      a gated page key (else -> /no-access). Admins bypass this check
-//      entirely and are the only ones allowed onto /admin.
+//      entirely and are the only ones allowed onto /admin or
+//      /rules-builder — Rules Builder isn't a togglable per-user page
+//      (see pages.ts), it's admin-only, full stop.
 // Runs on the Edge runtime — no Node crypto here, just a Supabase REST
 // lookup (fetch-based, edge-safe) and cookie/redirect logic. Password
 // hashing/session-token generation happen only in Server Actions
@@ -47,7 +49,7 @@ export async function proxy(request: NextRequest) {
     return redirectToLogin(request, true);
   }
 
-  if (pathname.startsWith("/admin")) {
+  if (pathname.startsWith("/admin") || pathname.startsWith("/rules-builder")) {
     if (!user.is_admin) return NextResponse.redirect(new URL("/no-access", request.url));
   } else if (pathname !== "/no-access" && !user.is_admin) {
     const pageKey = resolvePageKey(pathname);

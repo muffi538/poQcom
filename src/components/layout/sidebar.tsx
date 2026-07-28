@@ -19,8 +19,9 @@ import { MARKETPLACE_THEMES } from "@/lib/theme/marketplace-colors";
 import { logoutAction } from "@/lib/auth/logout-action";
 
 const staticLinks = [{ href: "/", pageKey: "overview", label: "Overview", icon: LayoutDashboard }];
+// Rules Builder is intentionally not here — it's admin-only (see below),
+// not a per-user togglable page, so it's never in this filtered list.
 const toolLinks = [
-  { href: "/rules-builder", pageKey: "rules-builder", label: "Rules Builder", icon: SlidersHorizontal },
   { href: "/data-sync", pageKey: "data-sync", label: "Data Sync", icon: RefreshCw },
   { href: "/settings", pageKey: "settings", label: "Settings", icon: Settings },
 ];
@@ -135,13 +136,22 @@ export function Sidebar({
             <NavItem key={l.href} {...l} active={pathname === l.href} collapsed={collapsed} />
           ))}
         {isAdmin && (
-          <NavItem
-            href="/admin"
-            label="Admin"
-            icon={ShieldCheck}
-            active={pathname === "/admin"}
-            collapsed={collapsed}
-          />
+          <>
+            <NavItem
+              href="/rules-builder"
+              label="Rules Builder"
+              icon={SlidersHorizontal}
+              active={pathname === "/rules-builder"}
+              collapsed={collapsed}
+            />
+            <NavItem
+              href="/admin"
+              label="Admin"
+              icon={ShieldCheck}
+              active={pathname === "/admin"}
+              collapsed={collapsed}
+            />
+          </>
         )}
       </nav>
 

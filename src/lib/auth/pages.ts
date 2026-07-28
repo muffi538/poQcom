@@ -19,8 +19,10 @@ export const MARKETPLACE_PAGES: PageDef[] = MARKETPLACES.map((m) => ({
   group: "marketplace",
 }));
 
+// Rules Builder is deliberately NOT in this list — it's admin-only (see
+// proxy.ts, same gate as /admin), not something an admin can grant to a
+// regular user, so it never appears as a togglable checkbox here.
 export const TOOL_PAGES: PageDef[] = [
-  { key: "rules-builder", label: "Rules Builder", group: "tools" },
   { key: "data-sync", label: "Data Sync", group: "tools" },
   { key: "settings", label: "Settings", group: "tools" },
 ];
@@ -28,14 +30,13 @@ export const TOOL_PAGES: PageDef[] = [
 export const ALL_PAGES: PageDef[] = [...STATIC_PAGES, ...MARKETPLACE_PAGES, ...TOOL_PAGES];
 
 // Maps a request path to the page key that gates it, or null for paths
-// that aren't behind the per-page permission check (/admin is gated on
-// is_admin instead; /login and /no-access are always reachable once
-// logged in).
+// that aren't behind the per-page permission check (/admin and
+// /rules-builder are gated on is_admin instead; /login and /no-access
+// are always reachable once logged in).
 export function resolvePageKey(pathname: string): string | null {
   if (pathname === "/") return "overview";
   const marketplaceMatch = pathname.match(/^\/marketplaces\/([^/]+)/);
   if (marketplaceMatch) return marketplaceMatch[1];
-  if (pathname.startsWith("/rules-builder")) return "rules-builder";
   if (pathname.startsWith("/data-sync")) return "data-sync";
   if (pathname.startsWith("/settings")) return "settings";
   return null;
