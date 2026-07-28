@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import {
   LayoutDashboard,
   Settings,
@@ -96,19 +97,29 @@ function NavItem({
   );
 }
 
+// Sidebar width in both states — SIDEBAR_WIDTH_PX is the single source of
+// truth AppShell reads to offset <main> by the same amount, since a truly
+// `fixed` sidebar (required so it never moves and never scrolls with the
+// page) is taken out of document flow and can't push main over on its own
+// the way an in-flow flex sibling would.
+export const SIDEBAR_WIDTH_PX = { expanded: 176, collapsed: 48 } as const;
+
 export function Sidebar({
   isAdmin,
   allowedPages,
   email,
   lastSyncedAt,
+  collapsed,
+  onToggleCollapsed,
 }: {
   isAdmin: boolean;
   allowedPages: string[];
   email: string;
   lastSyncedAt: string | null;
+  collapsed: boolean;
+  onToggleCollapsed: Dispatch<SetStateAction<boolean>>;
 }) {
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(false);
   // Admins bypass the per-page allow-list entirely (see src/proxy.ts) —
   // the Sidebar mirrors that so an admin never sees a page hidden from
   // them just because nobody granted their own account explicit access.
@@ -117,7 +128,7 @@ export function Sidebar({
 
   return (
     <aside
-      className={`sticky top-0 flex h-dvh shrink-0 flex-col border-r border-black/10 bg-frido-sidebar transition-[width] duration-200 dark:border-white/10 dark:bg-neutral-950 ${
+      className={`fixed inset-y-0 left-0 z-10 flex h-dvh shrink-0 flex-col border-r border-black/10 bg-frido-sidebar transition-[width] duration-200 dark:border-white/10 dark:bg-neutral-950 ${
         collapsed ? "w-12" : "w-44"
       }`}
     >
@@ -198,7 +209,7 @@ export function Sidebar({
           </button>
         </form>
         <button
-          onClick={() => setCollapsed((c) => !c)}
+          onClick={() => onToggleCollapsed((c) => !c)}
           className="flex w-full items-center justify-center gap-2 rounded-md border border-white/20 py-1.5 text-xs text-white/80 transition-colors hover:bg-white/10 dark:border-white/10 dark:text-neutral-500 dark:hover:bg-neutral-900"
         >
           {collapsed ? <ChevronsRight size={16} /> : <ChevronsLeft size={16} />}

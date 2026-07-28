@@ -1,5 +1,5 @@
 import { headers } from "next/headers";
-import { Sidebar } from "@/components/layout/sidebar";
+import { AppShell } from "@/components/layout/app-shell";
 import { getLastSyncedAt } from "@/lib/sync/last-synced";
 
 // Every real page lives under this route group so it shares one guard:
@@ -15,9 +15,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const lastSyncedAt = await getLastSyncedAt();
 
   return (
-    <div className="flex min-h-screen">
-      <Sidebar isAdmin={isAdmin} allowedPages={allowedPages} email={email} lastSyncedAt={lastSyncedAt} />
-      <main className="min-w-0 flex-1 px-3 py-3">{children}</main>
-    </div>
+    <AppShell isAdmin={isAdmin} allowedPages={allowedPages} email={email} lastSyncedAt={lastSyncedAt}>
+      {children}
+    </AppShell>
   );
 }
