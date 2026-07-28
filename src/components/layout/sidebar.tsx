@@ -128,7 +128,14 @@ export function Sidebar({
 
   return (
     <aside
-      className={`fixed inset-y-0 left-0 z-10 flex h-dvh shrink-0 flex-col border-r border-black/10 bg-frido-sidebar transition-[width] duration-200 dark:border-white/10 dark:bg-neutral-950 ${
+      // No explicit height (h-dvh/h-screen) here on purpose: under the
+      // page-wide `zoom` CSS trick (see globals.css), a viewport-unit
+      // length computes against the zoomed coordinate space and ends up
+      // visually shorter than the real viewport, leaving a blank strip
+      // below a `position: fixed` box. `inset-y-0` (top:0; bottom:0)
+      // stretches it to fill the viewport as a positioning constraint
+      // instead, which isn't subject to the same mismatch.
+      className={`fixed inset-y-0 left-0 z-10 flex shrink-0 flex-col border-r border-black/10 bg-frido-sidebar transition-[width] duration-200 dark:border-white/10 dark:bg-neutral-950 ${
         collapsed ? "w-12" : "w-44"
       }`}
     >
