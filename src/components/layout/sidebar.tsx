@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
   Settings,
@@ -24,6 +24,39 @@ const toolLinks = [
   { href: "/data-sync", pageKey: "data-sync", label: "Data Sync", icon: RefreshCw },
   { href: "/settings", pageKey: "settings", label: "Settings", icon: Settings },
 ];
+
+function formatRelativeTime(iso: string): string {
+  const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+// Ticks its own relative-time text every 30s so "Last synced" stays
+// current without a page reload — the sync timestamp itself only comes
+// from the server (one fetch per navigation), this just re-renders the
+// "X ago" phrasing against the clock.
+function LastSyncedStatus({ lastSyncedAt }: { lastSyncedAt: string | null }) {
+  const [, forceTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => forceTick((n) => n + 1), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <div className="flex items-center gap-1.5 px-1 text-[11px] text-white/60 dark:text-neutral-500">
+      <span className="relative flex h-1.5 w-1.5 shrink-0">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
+        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-green-500" />
+      </span>
+      <span className="truncate">{lastSyncedAt ? `Synced ${formatRelativeTime(lastSyncedAt)}` : "Not synced yet"}</span>
+    </div>
+  );
+}
 
 function NavItem({
   href,
@@ -67,10 +100,12 @@ export function Sidebar({
   isAdmin,
   allowedPages,
   email,
+  lastSyncedAt,
 }: {
   isAdmin: boolean;
   allowedPages: string[];
   email: string;
+  lastSyncedAt: string | null;
 }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
@@ -146,6 +181,7 @@ export function Sidebar({
       </nav>
 
       <div className="m-2 space-y-2">
+        {!collapsed && <LastSyncedStatus lastSyncedAt={lastSyncedAt} />}
         {!collapsed && email && (
           <div className="truncate px-1 text-[11px] text-white/60 dark:text-neutral-500" title={email}>
             {email}

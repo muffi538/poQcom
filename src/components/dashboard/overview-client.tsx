@@ -5,17 +5,11 @@ import { KpiCard } from "@/components/dashboard/kpi-card";
 import { PoControlTower } from "@/components/dashboard/po-control-tower";
 import { PriorityDonutChart } from "@/components/dashboard/priority-donut-chart";
 import { CityDonutChart } from "@/components/dashboard/city-donut-chart";
-import { PoCharts } from "@/components/dashboard/po-charts";
-import { SecondaryPoTable } from "@/components/dashboard/secondary-po-table";
-import { DeliveredPoTable } from "@/components/dashboard/delivered-po-table";
-import { OperationalPoTable } from "@/components/dashboard/operational-po-table";
-import { NeedsReviewPoTable } from "@/components/dashboard/needs-review-po-table";
 import { DemandIntelligenceTabs } from "@/components/dashboard/demand-intelligence-tabs";
 import { SupportedMarketplace } from "@/lib/sheets/marketplaces";
 import { buildTopSkuTable, TopSkuTableResult } from "@/lib/demand/sku-table";
 import { buildExecutiveSummary } from "@/lib/dashboard/summary";
 import { buildPoRows } from "@/lib/dashboard/po-rows";
-import { buildDeliveredRows } from "@/lib/workflows/delivered-workflow";
 import { classifyOperationalStatus, isFullyExcludedStatus, PurchaseOrder } from "@/types/purchase-order";
 import { Rule } from "@/types/rules";
 import { EngineConfig } from "@/lib/config/engine-config";
@@ -76,51 +70,16 @@ export function OverviewClient({
   // apart.
   const [poFilters, setPoFilters] = useState(DEFAULT_PO_CONTROL_FILTERS);
 
-  const {
-    summary,
-    pendingRows,
-    expiredRows,
-    deliveredRows,
-    dispatchedPos,
-    inTransitPos,
-    scheduledPos,
-    cancelledPos,
-    lowValuePos,
-    needsReviewPos,
-    topSkuByMarketplace,
-  } = useMemo(() => {
+  const { summary, pendingRows, topSkuByMarketplace } = useMemo(() => {
     const filteredPos = filterPurchaseOrdersByDate(pos, dateFilter);
 
     const visiblePos = filteredPos.filter((po) => !isFullyExcludedStatus(po.status));
-    const byStatus = new Map<string, PurchaseOrder[]>();
-    for (const po of visiblePos) {
-      const bucket = classifyOperationalStatus(po);
-      const group = byStatus.get(bucket) ?? [];
-      group.push(po);
-      byStatus.set(bucket, group);
-    }
-    const pendingPos = byStatus.get("pending") ?? [];
-    // Literal-text "Expired" status only (see isExpiredStatus) — no sheet
-    // currently writes this, so this is essentially always empty.
-    const literalExpiredPos = byStatus.get("expired") ?? [];
-    const deliveredPos = byStatus.get("delivered") ?? [];
+    const pendingPos = visiblePos.filter((po) => classifyOperationalStatus(po) === "pending");
     const pendingRows = buildPoRows(pendingPos, rules, config, demandIndex);
 
     return {
       summary: buildExecutiveSummary(visiblePos, rules, config, demandIndex),
       pendingRows,
-      // A subset of Pending Orders past their own expiry date (isOverdue),
-      // not a separate bucket — keeps this total from ever exceeding
-      // Pending Orders / the priority donut, which both come from the
-      // same pendingRows.
-      expiredRows: [...pendingRows.filter((r) => r.isOverdue), ...buildPoRows(literalExpiredPos, rules, config, demandIndex)],
-      deliveredRows: buildDeliveredRows(deliveredPos),
-      dispatchedPos: byStatus.get("dispatched") ?? [],
-      inTransitPos: byStatus.get("in_transit") ?? [],
-      scheduledPos: byStatus.get("scheduled") ?? [],
-      cancelledPos: byStatus.get("cancelled") ?? [],
-      lowValuePos: byStatus.get("low_value_cant_dispatch") ?? [],
-      needsReviewPos: byStatus.get("needs_review") ?? [],
       topSkuByMarketplace: Object.fromEntries(
         marketplaces.map((m) => [m, buildTopSkuTable(m as SupportedMarketplace, demandIndex, pendingPos)])
       ) as Record<string, TopSkuTableResult>,
@@ -185,31 +144,6 @@ export function OverviewClient({
         hideDonut
       />
       <DemandIntelligenceTabs marketplaces={marketplaces} data={topSkuByMarketplace} />
-      <details className="glass-card rounded-lg px-3 py-1.5 text-xs">
-        <summary className="cursor-pointer select-none font-medium text-neutral-500">
-          Expired, Delivered, Dispatched, In Transit, Scheduled, Cancelled, Low Value, Needs Review, and Charts
-        </summary>
-        <div className="mt-2 space-y-3 pb-1">
-          <SecondaryPoTable
-            title="Expired POs"
-            note="Pending POs that passed their own expiry date — still run through the Priority Engine."
-            rows={expiredRows}
-          />
-          <DeliveredPoTable rows={deliveredRows} />
-          <OperationalPoTable
-            title="Dispatched POs"
-            note="Already shipped — read-only, kept for dispatch-performance history."
-            variant="dispatched"
-            pos={dispatchedPos}
-          />
-          <OperationalPoTable title="In Transit POs" variant="in_transit" pos={inTransitPos} />
-          <OperationalPoTable title="Scheduled POs" variant="scheduled" pos={scheduledPos} />
-          <OperationalPoTable title="Cancelled POs" note="Read-only — kept for record." variant="cancelled" pos={cancelledPos} />
-          <OperationalPoTable title="Low Value Can't Dispatch" variant="low_value_cant_dispatch" pos={lowValuePos} />
-          <NeedsReviewPoTable pos={needsReviewPos} />
-          <PoCharts rows={pendingRows} />
-        </div>
-      </details>
     </div>
   );
 }
