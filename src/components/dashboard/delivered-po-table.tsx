@@ -129,8 +129,6 @@ export function DeliveredPoTable({ rows, fillHeight }: { rows: DeliveredRow[]; f
   const [selected, setSelected] = useState<DeliveredRow | null>(null);
   const [cityFilter, setCityFilter] = useState<string>("all");
   const [marketplaceFilter, setMarketplaceFilter] = useState<string>("all");
-  const [dispatcherFilter, setDispatcherFilter] = useState<string>("all");
-  const [dispatchedFromFilter, setDispatchedFromFilter] = useState<string>("all");
   const [fillRateBucket, setFillRateBucket] = useState<FillRateBucket>("all");
   const [deliverySpeedBucket, setDeliverySpeedBucket] = useState<DeliverySpeedBucket>("all");
   const [poDateFrom, setPoDateFrom] = useState<string>("");
@@ -141,21 +139,11 @@ export function DeliveredPoTable({ rows, fillHeight }: { rows: DeliveredRow[]; f
 
   const cities = useMemo(() => Array.from(new Set(rows.map((r) => r.po.city))).filter(Boolean).sort(), [rows]);
   const marketplaces = useMemo(() => Array.from(new Set(rows.map((r) => r.po.marketplace))).filter(Boolean).sort(), [rows]);
-  const dispatchers = useMemo(
-    () => Array.from(new Set(rows.map((r) => r.po.dispatcherName).filter((v): v is string => Boolean(v)))).sort(),
-    [rows]
-  );
-  const dispatchedFroms = useMemo(
-    () => Array.from(new Set(rows.map((r) => r.po.dispatchedFrom).filter((v): v is string => Boolean(v)))).sort(),
-    [rows]
-  );
 
   const filtered = useMemo(() => {
     return rows.filter((r) => {
       if (cityFilter !== "all" && r.po.city !== cityFilter) return false;
       if (marketplaceFilter !== "all" && r.po.marketplace !== marketplaceFilter) return false;
-      if (dispatcherFilter !== "all" && r.po.dispatcherName !== dispatcherFilter) return false;
-      if (dispatchedFromFilter !== "all" && r.po.dispatchedFrom !== dispatchedFromFilter) return false;
       if (!matchesFillRateBucket(r.po.fillRate, fillRateBucket)) return false;
       if (!matchesDeliverySpeedBucket(r.po.fulfilmentDays, deliverySpeedBucket)) return false;
       // PO Date range — ISO yyyy-mm-dd strings compare correctly as-is,
@@ -175,7 +163,7 @@ export function DeliveredPoTable({ rows, fillHeight }: { rows: DeliveredRow[]; f
       }
       return true;
     });
-  }, [rows, cityFilter, marketplaceFilter, dispatcherFilter, dispatchedFromFilter, fillRateBucket, deliverySpeedBucket, poDateFrom, poDateTo, search]);
+  }, [rows, cityFilter, marketplaceFilter, fillRateBucket, deliverySpeedBucket, poDateFrom, poDateTo, search]);
 
   const sorted = useMemo(() => {
     if (!sortKey) return filtered;
@@ -245,26 +233,6 @@ export function DeliveredPoTable({ rows, fillHeight }: { rows: DeliveredRow[]; f
                   {cities.map((c) => (
                     <option key={c} value={c}>
                       {c}
-                    </option>
-                  ))}
-                </select>
-              )}
-              {dispatchers.length > 0 && (
-                <select value={dispatcherFilter} onChange={(e) => setDispatcherFilter(e.target.value)} className={inputClasses}>
-                  <option value="all">Dispatcher: All</option>
-                  {dispatchers.map((d) => (
-                    <option key={d} value={d}>
-                      {d}
-                    </option>
-                  ))}
-                </select>
-              )}
-              {dispatchedFroms.length > 0 && (
-                <select value={dispatchedFromFilter} onChange={(e) => setDispatchedFromFilter(e.target.value)} className={inputClasses}>
-                  <option value="all">Dispatched From: All</option>
-                  {dispatchedFroms.map((d) => (
-                    <option key={d} value={d}>
-                      {d}
                     </option>
                   ))}
                 </select>
