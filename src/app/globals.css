@@ -9,15 +9,12 @@
 }
 
 @layer base {
-  /* Renders the whole app at 125% the size it'd be at native scale — same
-     effect as the user manually setting browser zoom to 125%, applied by
-     default instead of asking every visitor to do it themselves. `zoom`
-     (not `transform: scale`) is used because it reflows layout and scales
-     vh/vw units along with everything else, instead of just repainting a
-     fixed-size box and leaving blank space/mismatched vh-based heights
-     (e.g. the PO table's `h-[80vh]`). */
+  /* Renders the whole app at native scale (no zoom applied) — 125% read
+     as too zoomed-in, 75% as too small, so this is the un-zoomed middle
+     ground. Kept as an explicit `zoom: 100%` (not just deleting the
+     rule) so the next size tweak is a one-line change here again. */
   html {
-    zoom: 125%;
+    zoom: 100%;
   }
 
   body {
