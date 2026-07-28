@@ -11,6 +11,7 @@ export type AuditAction =
   | "auth.login_failed"
   | "auth.login_blocked" // rate-limited
   | "auth.logout"
+  | "auth.password_changed"
   | "admin.user_created"
   | "admin.user_deleted"
   | "admin.user_enabled"
