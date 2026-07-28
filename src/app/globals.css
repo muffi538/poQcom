@@ -9,12 +9,13 @@
 }
 
 @layer base {
-  /* Renders the whole app at native scale (no zoom applied) — 125% read
-     as too zoomed-in, 75% as too small, so this is the un-zoomed middle
-     ground. Kept as an explicit `zoom: 100%` (not just deleting the
-     rule) so the next size tweak is a one-line change here again. */
+  /* Renders the whole app at 75% the size it'd be at native scale. 125%
+     read as too zoomed-in, and 100% still read as too zoomed-in on the
+     user's actual screen, so this goes back to the one value they
+     confirmed was correct earlier (matched against their own browser
+     zoom control screenshot at 75%). */
   html {
-    zoom: 100%;
+    zoom: 75%;
   }
 
   body {
