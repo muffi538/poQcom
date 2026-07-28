@@ -104,8 +104,6 @@ export function MarketplaceTabbedView({
     [pathname, router, searchParams]
   );
 
-  const criticalCount = useMemo(() => pendingRows.filter((r) => r.level === "Critical").length, [pendingRows]);
-
   // Every visible PO regardless of status, in one place — every bucket
   // above is mutually exclusive (classifyOperationalStatus assigns each
   // PO to exactly one), so this is a safe union with no double-counting.
@@ -127,7 +125,9 @@ export function MarketplaceTabbedView({
   const tabs = [
     { key: "all", label: TAB_LABELS.all, count: allPos.length },
     { key: "pending", label: TAB_LABELS.pending, count: pendingRows.length },
-    { key: "critical", label: TAB_LABELS.critical, count: criticalCount },
+    // "Critical" removed from the Status dropdown only — the tab/filter
+    // itself, the Critical KPI, badges, and donut slice everywhere else
+    // are untouched. Reachable only via the Priority filter now.
     { key: "expired", label: TAB_LABELS.expired, count: expiredRows.length },
     { key: "delivered", label: TAB_LABELS.delivered, count: deliveredRows.length },
     { key: "dispatched", label: TAB_LABELS.dispatched, count: dispatchedPos.length },
