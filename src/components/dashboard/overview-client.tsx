@@ -34,10 +34,6 @@ function fmtNumber(n: number): string {
   return n.toLocaleString("en-IN");
 }
 
-function fmtCurrency(n: number): string {
-  return `₹${Math.round(n).toLocaleString("en-IN")}`;
-}
-
 // Everything below buildExecutiveSummary/buildPoRows/buildTopSkuTable
 // used to run once, server-side, in page.tsx. It's moved here (a Client
 // Component) so the global date filter — shared with every marketplace
@@ -148,7 +144,14 @@ export function OverviewClient({
       <div className="grid grid-cols-3 gap-2">
         <KpiCard label="Active PO" value={fmtNumber(summary.totalActive)} tone="accent" />
         <KpiCard label="Pending Qty" value={fmtNumber(summary.pendingQty)} />
-        <KpiCard label="Pending Value" value={fmtCurrency(summary.pendingValue)} />
+        <KpiCard
+          label="Most Pending"
+          value={
+            summary.topPendingMarketplace
+              ? `${summary.topPendingMarketplace.count} ${summary.topPendingMarketplace.marketplace}`
+              : "—"
+          }
+        />
         <KpiCard label="Critical" value={fmtNumber(summary.critical)} tone="critical" />
         <KpiCard label="Expired Pending" value={fmtNumber(summary.expiredPending)} tone="critical" />
         <KpiCard label="Expiring <10 Days" value={fmtNumber(summary.expiringWithin10Days)} tone="high" />

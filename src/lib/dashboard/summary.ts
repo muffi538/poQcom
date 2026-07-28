@@ -16,6 +16,7 @@ export interface ExecutiveSummary {
   expiredPending: number; // isOverdue: past its own expiry date, still not Delivered
   pendingQty: number;
   pendingValue: number;
+  topPendingMarketplace: { marketplace: string; count: number } | null;
   avgDispatchTimeDays: number | null;
   avgOperationalDelayDaysLate: number | null; // average lateness among the currently-overdue only
 }
@@ -45,6 +46,7 @@ export function buildExecutiveSummary(
 
   const dispatchTimes: number[] = [];
   const operationalDelaysLate: number[] = [];
+  const pendingCountByMarketplace = new Map<string, number>();
 
   let critical = 0,
     high = 0,
@@ -78,6 +80,15 @@ export function buildExecutiveSummary(
     if (po.poValue !== null && po.orderedQty > 0) {
       pendingValue += (po.pendingQty / po.orderedQty) * po.poValue;
     }
+
+    pendingCountByMarketplace.set(po.marketplace, (pendingCountByMarketplace.get(po.marketplace) ?? 0) + 1);
+  }
+
+  let topPendingMarketplace: { marketplace: string; count: number } | null = null;
+  for (const [marketplace, count] of pendingCountByMarketplace) {
+    if (!topPendingMarketplace || count > topPendingMarketplace.count) {
+      topPendingMarketplace = { marketplace, count };
+    }
   }
 
   // Dispatch time is historical/informational, so it looks across every
@@ -100,6 +111,7 @@ export function buildExecutiveSummary(
     expiredPending,
     pendingQty,
     pendingValue,
+    topPendingMarketplace,
     avgDispatchTimeDays: average(dispatchTimes),
     avgOperationalDelayDaysLate: average(operationalDelaysLate),
   };
