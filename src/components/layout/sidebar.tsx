@@ -117,7 +117,7 @@ export function Sidebar({
 
   return (
     <aside
-      className={`sticky top-0 flex min-h-screen shrink-0 flex-col border-r border-black/10 bg-frido-sidebar transition-[width] duration-200 dark:border-white/10 dark:bg-neutral-950 ${
+      className={`sticky top-0 flex h-dvh shrink-0 flex-col border-r border-black/10 bg-frido-sidebar transition-[width] duration-200 dark:border-white/10 dark:bg-neutral-950 ${
         collapsed ? "w-12" : "w-44"
       }`}
     >
