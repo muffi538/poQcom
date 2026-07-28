@@ -10,6 +10,7 @@ import {
   setUserEnabledAction,
   setUserPasswordAction,
   setUserPermissionsAction,
+  ActionResult,
 } from "./actions";
 
 export interface AdminUserRow {
@@ -90,16 +91,16 @@ function AddUserForm({ allPages }: { allPages: PageDef[] }) {
   const submit = () => {
     setError(null);
     startTransition(async () => {
-      try {
-        await createUserAction({ email, password, pageKeys: Array.from(pageKeys) });
-        setEmail("");
-        setPassword("");
-        setPageKeys(new Set());
-        setOpen(false);
-        router.refresh();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to create user.");
+      const result = await createUserAction({ email, password, pageKeys: Array.from(pageKeys) });
+      if (result.error) {
+        setError(result.error);
+        return;
       }
+      setEmail("");
+      setPassword("");
+      setPageKeys(new Set());
+      setOpen(false);
+      router.refresh();
     });
   };
 
@@ -162,17 +163,17 @@ function UserRow({ user, allPages, isSelf }: { user: AdminUserRow; allPages: Pag
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const runAction = (fn: () => Promise<void>, successMessage?: string) => {
+  const runAction = (fn: () => Promise<ActionResult>, successMessage?: string) => {
     setError(null);
     setMessage(null);
     startTransition(async () => {
-      try {
-        await fn();
-        if (successMessage) setMessage(successMessage);
-        router.refresh();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong.");
+      const result = await fn();
+      if (result.error) {
+        setError(result.error);
+        return;
       }
+      if (successMessage) setMessage(successMessage);
+      router.refresh();
     });
   };
 
@@ -268,8 +269,9 @@ function UserRow({ user, allPages, isSelf }: { user: AdminUserRow; allPages: Pag
               <button
                 onClick={() =>
                   runAction(async () => {
-                    await setUserPasswordAction(user.id, passwordDraft);
-                    setPasswordDraft("");
+                    const result = await setUserPasswordAction(user.id, passwordDraft);
+                    if (!result.error) setPasswordDraft("");
+                    return result;
                   }, "Password updated.")
                 }
                 disabled={pending || passwordDraft.length < 10}
