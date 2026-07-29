@@ -10,7 +10,15 @@
 // unavailable for them (never fabricated), everything else (Delivered
 // workflow, dispatch matching, SKU demand analytics) works the same as
 // any other marketplace.
-export const MARKETPLACES = ["Zepto", "Blinkit", "Instamart", "Flipkart Minutes", "BigBasket", "Amazon Now"] as const;
+//
+// E-trade added 2026-07-29 (its own tab in the same shared workbook,
+// confirmed against real data). Its PO Date column mixes DD-MM-YYYY and
+// MM/DD/YYYY formatting within the same column (see parseSheetDate in
+// src/lib/po/dates.ts), and its sheet has two identically-named
+// "Location" columns — only the leftmost (a bare FC code, e.g. "HYD8")
+// is reachable through the standard mapping, so city comes from a code
+// lookup table (cityFromEtradeLocation) rather than the fuller string.
+export const MARKETPLACES = ["Zepto", "Blinkit", "Instamart", "Flipkart Minutes", "BigBasket", "Amazon Now", "E-trade"] as const;
 
 export type Marketplace = (typeof MARKETPLACES)[number] | (string & {});
 

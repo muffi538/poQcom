@@ -21,16 +21,32 @@ function buildDate(year: number, month1To12: number, day: number): string | null
 // or null when a cell is blank or genuinely unparseable (e.g. Blinkit's
 // occasional "2 June" with no year) — confirmed to just leave those rows
 // with no appointment date rather than guessing.
+//
+// E-trade's PO Date column mixes this m/d/yyyy format with a dash-
+// separated d-m-yyyy one in the same column (confirmed against the real
+// sheet, 2026-07-29 — some cells are manually-typed Indian-convention
+// text, others are real date cells Google exports US-style). The dash
+// fallback only ever fires when the slash pattern doesn't match, and no
+// other marketplace's PO/Expiry/Appointment/Dispatch date column uses a
+// dash separator (confirmed via grep), so this is purely additive.
 export function parseSheetDate(value: string | undefined | null): string | null {
   if (!value) return null;
   const trimmed = value.trim();
   if (!trimmed) return null;
 
-  const match = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (!match) return null;
+  const slashMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slashMatch) {
+    const [, month, day, year] = slashMatch;
+    return buildDate(Number(year), Number(month), Number(day));
+  }
 
-  const [, month, day, year] = match;
-  return buildDate(Number(year), Number(month), Number(day));
+  const dashMatch = trimmed.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if (dashMatch) {
+    const [, day, month, year] = dashMatch;
+    return buildDate(Number(year), Number(month), Number(day));
+  }
+
+  return null;
 }
 
 // d/m/yyyy variant — confirmed needed for the Dispatch sheet specifically

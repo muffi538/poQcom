@@ -50,6 +50,31 @@ const PO_SELECT =
   "ordered_qty, dispatched_qty, pending_qty, po_value, fill_rate, dispatcher_name, driver_name, dispatched_from, " +
   "appointment_qty, fulfilment_days, shipment_id, consignment_id, invoice, mrp_label, marketplaces(name)";
 
+// PostgREST caps any unpaginated response at its project-configured max
+// rows (1000 here) and returns a 206 Partial Content with the rest
+// silently dropped — no error, just fewer rows than exist. Every
+// marketplace stayed under that cap until E-trade (1495 POs) exposed it:
+// its own page showed only 1 Pending PO instead of 71, because the
+// truncated batch happened to contain almost none of them. Paging
+// through with .range() until a page comes back short of the page size
+// is the fix, applied to both the per-marketplace and all-marketplaces
+// loaders below since the "all marketplaces" total crosses 1000 too.
+const PAGE_SIZE = 1000;
+
+async function fetchAllRows<T>(build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>): Promise<T[]> {
+  const rows: T[] = [];
+  let from = 0;
+  for (;;) {
+    const { data, error } = await build(from, from + PAGE_SIZE - 1);
+    if (error) throw new Error(`Failed to load purchase_orders: ${error.message}`);
+    const page = data ?? [];
+    rows.push(...page);
+    if (page.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+  return rows;
+}
+
 // PostgREST's .in() filter puts every id in the request URL — with
 // hundreds of POs (each a 36-char uuid) that URL gets long enough to
 // fail outright ("TypeError: fetch failed", confirmed against the real
@@ -135,9 +160,10 @@ async function assemblePurchaseOrders(poRows: PoRowFromDb[]): Promise<PurchaseOr
 }
 
 export async function fetchPurchaseOrdersForMarketplace(marketplaceId: string): Promise<PurchaseOrder[]> {
-  const { data, error } = await supabase.from("purchase_orders").select(PO_SELECT).eq("marketplace_id", marketplaceId);
-  if (error) throw new Error(`Failed to load purchase_orders: ${error.message}`);
-  return assemblePurchaseOrders((data ?? []) as unknown as PoRowFromDb[]);
+  const rows = await fetchAllRows((from, to) =>
+    supabase.from("purchase_orders").select(PO_SELECT).eq("marketplace_id", marketplaceId).range(from, to)
+  );
+  return assemblePurchaseOrders(rows as unknown as PoRowFromDb[]);
 }
 
 // Marketplace pages key off the marketplace's display name (matching
@@ -155,7 +181,6 @@ export async function fetchPurchaseOrdersForMarketplaceName(marketplaceName: str
 }
 
 export async function fetchAllPurchaseOrdersFromSupabase(): Promise<PurchaseOrder[]> {
-  const { data, error } = await supabase.from("purchase_orders").select(PO_SELECT);
-  if (error) throw new Error(`Failed to load purchase_orders: ${error.message}`);
-  return assemblePurchaseOrders((data ?? []) as unknown as PoRowFromDb[]);
+  const rows = await fetchAllRows((from, to) => supabase.from("purchase_orders").select(PO_SELECT).range(from, to));
+  return assemblePurchaseOrders(rows as unknown as PoRowFromDb[]);
 }

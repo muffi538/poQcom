@@ -27,6 +27,10 @@ export const MARKETPLACE_THEMES: Record<string, MarketplaceTheme> = {
   BigBasket: { primary: "#84C225", accent: "#A8D65C" },
   FBF: { primary: "#00A86B", accent: "#00A86B" },
   "E-Trade": { primary: "#0099FF", accent: "#0099FF" },
+  // Actual registered marketplace name (src/types/marketplace.ts) is
+  // "E-trade" (lowercase t) — lookup below is a literal string match, so
+  // this needs its own key distinct from the pre-seeded "E-Trade" above.
+  "E-trade": { primary: "#0099FF", accent: "#66C2FF" },
 };
 
 // Overview / default brand identity.

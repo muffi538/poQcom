@@ -13,7 +13,15 @@
 // in src/types/marketplace.ts for what's structurally different about
 // their real sheets (no Expiry Date for either; BigBasket also has no
 // PO Date/City).
-export const SUPPORTED_MARKETPLACES = ["Zepto", "Blinkit", "Instamart", "Flipkart Minutes", "BigBasket", "Amazon Now"] as const;
+export const SUPPORTED_MARKETPLACES = [
+  "Zepto",
+  "Blinkit",
+  "Instamart",
+  "Flipkart Minutes",
+  "BigBasket",
+  "Amazon Now",
+  "E-trade",
+] as const;
 export type SupportedMarketplace = (typeof SUPPORTED_MARKETPLACES)[number];
 
 export interface TabConfig {
@@ -68,6 +76,13 @@ export const TAB_CONFIG: Record<SupportedMarketplace, TabConfig> = {
   },
   "Amazon Now": {
     gidEnvKey: "GOOGLE_SHEET_GID_AMAZON_NOW",
+    headerRowIndex: 1,
+    poNoColumn: "PO Number",
+  },
+  // E-trade also syncs exclusively through Data Sync's sheet_connections
+  // (never this env var) — same reasoning as BigBasket/Amazon Now above.
+  "E-trade": {
+    gidEnvKey: "GOOGLE_SHEET_GID_ETRADE",
     headerRowIndex: 1,
     poNoColumn: "PO Number",
   },

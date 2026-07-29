@@ -6,6 +6,7 @@ import {
   cityFromInstamartFcName,
   cityFromAmazonNowLocation,
   cityFromBigBasketLocation,
+  cityFromEtradeLocation,
 } from "@/lib/po/city";
 import { detectHeaderRow, toNumber } from "./parsing";
 import { ImportLineItem } from "./types";
@@ -54,14 +55,28 @@ export async function loadFieldMappings(marketplaceId: string, workbookType: Wor
 // column name — both occurrences share the same name — so this is a
 // deliberate, narrow exception to "match by name, not position": among
 // same-named columns, leftmost is the anchor.
+//
+// Later occurrences aren't discarded, though — they're also exposed
+// under a synthetic "<name> (#2)", "<name> (#3)", ... key, so a mapping
+// can target a specific later occurrence on the rare marketplace where
+// the LEFTMOST one is the dead column instead (confirmed on E-trade:
+// both "Location " columns are byte-identical headers, but only the
+// second ever has data — the first is blank on every row).
 export function extractRowsByHeader(rawRows: string[][], mappings: FieldMapping[], label: string): Record<string, string>[] {
   const requiredColumns = mappings.filter((m) => m.isRequired).map((m) => m.sheetColumnName);
   const { headerRowIndex, header } = detectHeaderRow(rawRows, requiredColumns, label);
   return rawRows.slice(headerRowIndex + 1).map((row) => {
     const keyed: Record<string, string> = {};
+    const occurrences = new Map<string, number>();
     header.forEach((col, i) => {
-      if (!col || col in keyed) return;
-      keyed[col] = row[i] ?? "";
+      if (!col) return;
+      const occurrence = (occurrences.get(col) ?? 0) + 1;
+      occurrences.set(col, occurrence);
+      if (occurrence === 1) {
+        keyed[col] = row[i] ?? "";
+      } else {
+        keyed[`${col} (#${occurrence})`] = row[i] ?? "";
+      }
     });
     return keyed;
   });
@@ -79,6 +94,7 @@ const CITY_DERIVATION_FUNCTIONS: Record<string, (warehouse: string) => string> =
   Instamart: cityFromInstamartFcName,
   "Amazon Now": cityFromAmazonNowLocation,
   BigBasket: cityFromBigBasketLocation,
+  "E-trade": cityFromEtradeLocation,
 };
 
 // Converts one sheet row (keyed by sheet column name) into the canonical

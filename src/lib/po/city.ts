@@ -63,3 +63,77 @@ export function cityFromBigBasketLocation(location: string): string {
   const city = parts[0]?.toUpperCase() === "WMS" ? parts[1] : parts[0];
   return toTitleCase(city || location);
 }
+
+// E-trade's sheet has two identically-named "Location " columns (both
+// literally "Location " — confirmed byte-identical, 2026-07-29); the
+// FIRST is blank on every single row, and the SECOND holds the real
+// value, e.g. "DEL6 - Gurgaon, HARYANA", "HYD8-Hyderabad, Telangana",
+// or occasionally just a bare code like "PNQ3" or "SHYL" with no city/
+// state suffix at all. The mapping targets the second occurrence via
+// extractRowsByHeader's "<name> (#2)" synthetic key. Formatting of the
+// suffix is inconsistent (" - ", "- ", "-", or nothing) so rather than
+// splitting on a dash like Amazon Now/BigBasket, this extracts the
+// leading alphanumeric code and looks it up here, same pattern as
+// Zepto's ZEPTO_CITY_CODES. Table built from the real sheet's full
+// Location column (2026-07-29); codes not in this table fall back to
+// the raw value rather than fabricating a city.
+export const ETRADE_CITY_CODES: Record<string, string> = {
+  AMD2: "Ahmedabad",
+  BBX1: "Bhubaneswar",
+  BL01: "Bengaluru",
+  BLR4: "Bengaluru",
+  BLR7: "Bangalore",
+  BLR8: "Bengaluru",
+  BLX1: "Bangalore",
+  BLX9: "Bangalore Rural",
+  BOM5: "Thane",
+  BOM7: "Bhiwandi",
+  BOX9: "Bhiwandi",
+  CCX1: "Howrah",
+  CCX2: "Kolkata",
+  CCX4: "Serampore",
+  CJB1: "Coimbatore",
+  DED3: "Gurgaon",
+  DED4: "Gurgaon",
+  DED5: "Gurugram",
+  DEL4: "Gurgaon",
+  DEL5: "Gurgaon",
+  DEL6: "Gurgaon",
+  DEX3: "New Delhi",
+  FBE2: "Kolar",
+  FBO5: "Thane",
+  FCC3: "Panchla",
+  FDL5: "Gurugram",
+  FHY3: "Hyderabad",
+  GAX1: "Guwahati",
+  HBL9: "Bengaluru",
+  HBX1: "Gurugram",
+  HBX2: "Hyderabad",
+  HDO3: "Gurugram",
+  HDX1: "Gurugram",
+  HNR4: "Dadri Toe",
+  HYD3: "Hyderabad",
+  HYD8: "Hyderabad",
+  HYX1: "Hyderabad",
+  IDX2: "Indore",
+  ISK3: "Bhiwandi",
+  LDX1: "Rajpura",
+  LKO1: "Lucknow",
+  MAA4: "Thiruvalluvar",
+  NAX1: "Nagpur",
+  PNQ2: "New Delhi",
+  PNQ3: "Chakan",
+  SBLU: "Bengaluru",
+  SBOB: "Bhiwandi",
+  SDEG: "Gurugram",
+  SHDZ: "Gurugram",
+  SHYH: "Hyderabad",
+};
+
+export function cityFromEtradeLocation(warehouse: string): string {
+  const trimmed = warehouse.trim();
+  const codeMatch = trimmed.match(/^[A-Za-z0-9]+/);
+  const code = codeMatch ? codeMatch[0].toUpperCase() : "";
+  const city = ETRADE_CITY_CODES[code] || trimmed;
+  return toTitleCase(city);
+}

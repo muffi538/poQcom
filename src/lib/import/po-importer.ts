@@ -10,6 +10,20 @@ export interface ImportPoResult {
   skippedRows: number;
 }
 
+// PostgREST sends .in()/.delete() filters as URL query params, not a
+// request body — a marketplace with enough POs in one sync (E-trade:
+// 1494) blows past the request URL/header size limit and the whole
+// fetch fails with an opaque "TypeError: fetch failed" before any SQL
+// even runs. Chunking keeps every filter list well under that limit
+// regardless of marketplace size.
+const IN_CLAUSE_CHUNK_SIZE = 200;
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size));
+  return chunks;
+}
+
 // The PO ingestion pipeline's core: raw rows in (from Google Sheets or an
 // uploaded workbook — this function doesn't know or care which), a
 // database source-of-truth answer for purchase_orders/purchase_order_items
@@ -63,17 +77,18 @@ export async function importPoWorkbookRows(params: {
 
   // Known-existing po_numbers BEFORE the upsert, so posInserted/posUpdated
   // can be reported separately — the upsert call itself can't tell insert
-  // from update apart.
-  const { data: existingBefore, error: existingError } = await supabase
-    .from("purchase_orders")
-    .select("po_number")
-    .eq("marketplace_id", marketplaceId)
-    .in(
-      "po_number",
-      aggregated.map((po) => po.poNo)
-    );
-  if (existingError) throw new Error(`Failed to check existing purchase_orders: ${existingError.message}`);
-  const existingPoNumbers = new Set((existingBefore ?? []).map((row) => row.po_number as string));
+  // from update apart. Batched (see IN_CLAUSE_CHUNK_SIZE) so a large
+  // marketplace's po_number list can't overflow the request URL.
+  const existingPoNumbers = new Set<string>();
+  for (const poNoBatch of chunk(aggregated.map((po) => po.poNo), IN_CLAUSE_CHUNK_SIZE)) {
+    const { data: existingBefore, error: existingError } = await supabase
+      .from("purchase_orders")
+      .select("po_number")
+      .eq("marketplace_id", marketplaceId)
+      .in("po_number", poNoBatch);
+    if (existingError) throw new Error(`Failed to check existing purchase_orders: ${existingError.message}`);
+    for (const row of existingBefore ?? []) existingPoNumbers.add(row.po_number as string);
+  }
   const posInserted = aggregated.filter((po) => !existingPoNumbers.has(po.poNo)).length;
   const posUpdated = aggregated.length - posInserted;
 
@@ -110,11 +125,11 @@ export async function importPoWorkbookRows(params: {
   // in this batch, then insert the freshly aggregated set. Same end
   // state no matter how many times the same sheet is re-imported.
   const affectedPoIds = Array.from(poIdByNumber.values());
-  if (affectedPoIds.length > 0) {
+  for (const poIdBatch of chunk(affectedPoIds, IN_CLAUSE_CHUNK_SIZE)) {
     const { error: deleteItemsError } = await supabase
       .from("purchase_order_items")
       .delete()
-      .in("purchase_order_id", affectedPoIds);
+      .in("purchase_order_id", poIdBatch);
     if (deleteItemsError) throw new Error(`Failed to clear purchase_order_items before re-import: ${deleteItemsError.message}`);
   }
 
