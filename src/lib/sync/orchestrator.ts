@@ -190,17 +190,27 @@ export async function syncSales(): Promise<SyncResult> {
     // — must run once, before the per-marketplace loop, never inside it.
     await clearAllSalesRecords();
 
+    // One marketplace's failed sync must never stop the rest — same
+    // degrade-independently precedent as fetchAllPurchaseOrders/syncAll's
+    // per-marketplace PO sync. Not every marketplace necessarily has a
+    // Sales mapping configured (e.g. E-trade: only a PO sheet was ever
+    // provided) — that's an expected, marketplace-specific gap, not a
+    // reason to fail this shared job for every OTHER marketplace too.
     const marketplaces = await listMarketplaces();
     let totalImported = 0;
     for (const marketplace of marketplaces) {
-      const result = await importSalesWorkbookRows({
-        marketplaceId: marketplace.id,
-        marketplaceName: marketplace.name,
-        platformTag: marketplace.salesPlatformTag,
-        rawRows,
-        salesUploadId: salesUpload.id as string,
-      });
-      totalImported += result.recordsImported;
+      try {
+        const result = await importSalesWorkbookRows({
+          marketplaceId: marketplace.id,
+          marketplaceName: marketplace.name,
+          platformTag: marketplace.salesPlatformTag,
+          rawRows,
+          salesUploadId: salesUpload.id as string,
+        });
+        totalImported += result.recordsImported;
+      } catch (err) {
+        console.warn(`[sales_sync] Skipping ${marketplace.name}: ${err instanceof Error ? err.message : String(err)}`);
+      }
     }
 
     await finishSyncJob(jobId, { status: "success", rowsInserted: totalImported, rowsUpdated: 0, rowsFailed: 0 });
@@ -241,18 +251,26 @@ export async function syncDispatch(): Promise<SyncResult> {
 
     const rawRows = await readRawRowsFromSheetUrl(connection.sheetUrl, connection.gid);
 
+    // Same per-marketplace isolation as syncSales above, and for the
+    // same reason: a marketplace with no Dispatch mapping configured
+    // (e.g. E-trade) must not fail this shared job for every OTHER
+    // marketplace.
     const marketplaces = await listMarketplaces();
     let totalUpdated = 0;
     let totalNotFound = 0;
     for (const marketplace of marketplaces) {
-      const result = await importDispatchWorkbookRows({
-        marketplaceId: marketplace.id,
-        marketplaceName: marketplace.name,
-        dispatchTag: marketplace.dispatchTag,
-        rawRows,
-      });
-      totalUpdated += result.posUpdated;
-      totalNotFound += result.posNotFound;
+      try {
+        const result = await importDispatchWorkbookRows({
+          marketplaceId: marketplace.id,
+          marketplaceName: marketplace.name,
+          dispatchTag: marketplace.dispatchTag,
+          rawRows,
+        });
+        totalUpdated += result.posUpdated;
+        totalNotFound += result.posNotFound;
+      } catch (err) {
+        console.warn(`[dispatch_sync] Skipping ${marketplace.name}: ${err instanceof Error ? err.message : String(err)}`);
+      }
     }
 
     await finishSyncJob(jobId, { status: "success", rowsInserted: 0, rowsUpdated: totalUpdated, rowsFailed: totalNotFound });
