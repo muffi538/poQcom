@@ -55,10 +55,20 @@ export async function destroySession(): Promise<void> {
   jar.delete(SESSION_COOKIE);
 }
 
-export async function getSessionUser(): Promise<SessionUser | null> {
+// Sign-in is not required anywhere in this app (deliberate: the
+// dashboard, Admin, and Rules Builder are all open to anyone with the
+// link, no account needed). A real login still works if someone signs
+// in explicitly — getSessionUser reflects that real session — but an
+// anonymous visitor is treated as a full admin (PUBLIC_USER below)
+// rather than being turned away, so every existing permission check
+// (isAdmin, pageKeys, requireAdmin, requirePagePermission) still passes
+// without each needing its own "no login required" special case.
+const PUBLIC_USER: SessionUser = { id: "anonymous", email: "anonymous", isAdmin: true, pageKeys: [] };
+
+export async function getSessionUser(): Promise<SessionUser> {
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
-  if (!token) return null;
+  if (!token) return PUBLIC_USER;
 
   const { data } = await supabase
     .from("app_sessions")
@@ -66,8 +76,8 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     .eq("token", token)
     .maybeSingle<SessionRow>();
 
-  if (!data || !data.app_users) return null;
-  if (new Date(data.expires_at) < new Date() || !data.app_users.is_enabled) return null;
+  if (!data || !data.app_users) return PUBLIC_USER;
+  if (new Date(data.expires_at) < new Date() || !data.app_users.is_enabled) return PUBLIC_USER;
 
   return {
     id: data.app_users.id,
@@ -77,9 +87,13 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   };
 }
 
+// PUBLIC_USER is always isAdmin, so this never actually throws today —
+// kept as the single choke point so re-requiring sign-in later (see
+// PUBLIC_USER above) restores real enforcement here with no other
+// changes needed.
 export async function requireAdmin(): Promise<SessionUser> {
   const user = await getSessionUser();
-  if (!user || !user.isAdmin) throw new Error("Admin access required.");
+  if (!user.isAdmin) throw new Error("Admin access required.");
   return user;
 }
 
@@ -90,7 +104,6 @@ export async function requireAdmin(): Promise<SessionUser> {
 // only an authorized user could ever have triggered it.
 export async function requirePagePermission(pageKey: string): Promise<SessionUser> {
   const user = await getSessionUser();
-  if (!user) throw new Error("Authentication required.");
   if (!user.isAdmin && !user.pageKeys.includes(pageKey)) throw new Error("You don't have permission to do that.");
   return user;
 }
